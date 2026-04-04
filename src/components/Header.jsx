@@ -33,7 +33,7 @@ export default function Header({
       {/* LEFT — Logo + brand + by TAITAN */}
       <div className="header-left">
         <img
-          src="/Assets/Logo-land.webp"
+          src={`${import.meta.env.BASE_URL}Assets/Logo-land.webp`}
           alt="Ru'ya logo"
           className="header-logo"
           onError={e => { e.target.style.display = 'none'; }}

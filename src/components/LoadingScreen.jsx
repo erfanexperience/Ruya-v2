@@ -159,7 +159,7 @@ export default function LoadingScreen({ isReady, onDone }) {
       <div className="loading-center">
         <div className="loading-logo-wrap">
           <img
-            src="/Assets/Logo.webp"
+            src={`${import.meta.env.BASE_URL}Assets/Logo.webp`}
             alt="Ru'ya"
             className="loading-logo"
           />

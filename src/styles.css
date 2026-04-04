@@ -1482,15 +1482,15 @@ html, body {
 
 /* ── Robot emerge-from-bottom intro animation (first page load only) ── */
 @keyframes robotEmerge {
-  from { transform: translateY(110vh); }
-  to   { transform: translateY(0); }
+  from { opacity: 0; transform: translateY(60px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
 
 .robot-overlay--intro {
-  animation: robotEmerge 1.6s cubic-bezier(0.16, 1, 0.32, 1) 0.3s both;
+  animation: robotEmerge 1.4s cubic-bezier(0.16, 1, 0.32, 1) 0.3s both;
 }
 
-/* Keep robot below screen while app is still behind the loading screen */
+/* Keep robot invisible while app is still behind the loading screen */
 .app:not(.app--visible) .robot-overlay--intro {
   animation-play-state: paused;
 }
