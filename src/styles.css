@@ -388,7 +388,8 @@ html, body {
    ═══════════════════════════════════════════════════════════════════ */
 .hero-section {
   position: relative;
-  min-height: 100vh;
+  height: 50vh;
+  min-height: 340px;
   display: flex;
   align-items: center;
   overflow: hidden;
@@ -401,8 +402,8 @@ html, body {
   flex: 0 0 58%;
   display: flex;
   flex-direction: column;
-  gap: 28px;
-  padding: 80px 0 80px;
+  gap: 20px;
+  padding: 0;
   z-index: 2;
 }
 
@@ -536,7 +537,8 @@ html, body {
 .hero-robot {
   flex: 0 0 42%;
   position: relative;
-  height: 100vh;
+  height: 50vh;
+  min-height: 340px;
   overflow: hidden;
 }
 
@@ -589,86 +591,105 @@ html, body {
 @media (max-width: 1023px) {
   .hero-section {
     flex-direction: column;
+    height: auto;
     min-height: auto;
-    padding: 80px 20px 40px;
-    gap: 0;
+    padding: 60px 20px 30px;
   }
   .hero-copy {
     flex: unset;
     width: 100%;
-    padding: 0;
-    gap: 20px;
+    gap: 16px;
   }
   .hero-robot {
     flex: unset;
     width: 100%;
-    height: 50vw;
-    min-height: 260px;
+    height: 44vw;
+    min-height: 220px;
   }
-  .hero-robot-inner {
-    inset: 0;
-    transform: none;
-  }
-  .hero-heading-line { font-size: clamp(28px, 8vw, 44px); }
+  .hero-robot-inner { inset: 0; transform: none; }
+  .hero-heading-line { font-size: clamp(24px, 7vw, 38px); }
 }
 
 /* ═══════════════════════════════════════════════════════════════════
-   NEWS FEED — vertical scrolling card grid
+   NEWS FEED — vertical scrolling card grid with varied sizes
    ═══════════════════════════════════════════════════════════════════ */
 .news-feed {
   width: 100%;
   max-width: 1400px;
   margin: 0 auto;
-  padding: 48px 32px 80px;
+  padding: 40px 32px 80px;
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 16px;
+  grid-template-columns: repeat(12, 1fr);
+  grid-auto-rows: 80px;
+  gap: 14px;
   align-items: start;
 }
 
-/* First card (hero) spans full width */
-.news-feed .feed-card-wrap:first-child {
-  grid-column: 1 / -1;
+/* ── Varied card sizes using a 12-column grid ──────────────────────
+   Pattern repeats every 7 cards:
+   1: wide+tall (col 1-7, rows 4)   2: medium (col 8-12, rows 3)
+   3: small (col 1-4, rows 3)        4: medium (col 5-9, rows 3)   5: small (col 10-12, rows 3)
+   6: medium (col 1-6, rows 3)       7: medium (col 7-12, rows 3)
+*/
+
+/* Card 1 (index 0) — large */
+.feed-card-wrap:nth-child(7n+1) { grid-column: span 7; grid-row: span 5; }
+/* Card 2 (index 1) — medium tall */
+.feed-card-wrap:nth-child(7n+2) { grid-column: span 5; grid-row: span 5; }
+/* Card 3 (index 2) — small */
+.feed-card-wrap:nth-child(7n+3) { grid-column: span 4; grid-row: span 4; }
+/* Card 4 (index 3) — medium */
+.feed-card-wrap:nth-child(7n+4) { grid-column: span 5; grid-row: span 4; }
+/* Card 5 (index 4) — small */
+.feed-card-wrap:nth-child(7n+5) { grid-column: span 3; grid-row: span 4; }
+/* Card 6 (index 5) — wide medium */
+.feed-card-wrap:nth-child(7n+6) { grid-column: span 6; grid-row: span 4; }
+/* Card 7 (index 6) — wide medium */
+.feed-card-wrap:nth-child(7n+7) { grid-column: span 6; grid-row: span 4; }
+
+/* ── Holographic appear animation ──────────────────────────────────── */
+@keyframes cardAppear {
+  0% {
+    opacity: 0;
+    transform: scale(0.88) translateY(16px);
+    filter: brightness(2) saturate(0) blur(4px);
+    clip-path: inset(0 100% 0 0);
+  }
+  30% {
+    clip-path: inset(0 0% 0 0);
+    filter: brightness(1.6) saturate(1.5) blur(1px);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(1.02) translateY(0);
+    filter: brightness(1.2) saturate(1.2) blur(0);
+  }
+  80% {
+    filter: brightness(0.85) saturate(0.9);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+    filter: brightness(1) saturate(1) blur(0);
+  }
 }
 
-/* Scroll-reveal: cards start invisible and slide up */
 .feed-card-wrap {
   opacity: 0;
-  transform: translateY(32px);
-  transition:
-    opacity 0.55s var(--ease-out-expo),
-    transform 0.55s var(--ease-out-expo);
-  transition-delay: calc(var(--card-index, 0) * 40ms);
+  will-change: opacity, transform;
 }
 
-/* Triggered by IntersectionObserver in NewsViewport */
-.feed-card-wrap .card--visible,
-.feed-card-wrap:has(.card--visible) {
-  opacity: 1;
-  transform: translateY(0);
+.feed-card-wrap.card-appeared {
+  animation: cardAppear 0.7s var(--ease-out-expo) both;
+  animation-delay: calc(var(--card-index, 0) * 60ms);
 }
-
-/* Also animate the feed-card-wrap itself when child card is visible */
-.feed-card-wrap:has(.card.card--visible) {
-  opacity: 1;
-  transform: translateY(0);
-}
-
-/* Fallback for browsers without :has — make wrap visible when card is visible */
-.card--visible {
-  opacity: 1 !important;
-  transform: translateY(0) !important;
-}
-
-/* Override: feed-card-wrap visibility driven by JS adding card--visible */
-.feed-card-wrap { will-change: opacity, transform; }
 
 .news-feed--empty {
+  grid-column: 1 / -1;
   min-height: 40vh;
   display: flex;
   align-items: center;
   justify-content: center;
-  grid-template-columns: 1fr;
 }
 
 /* Card inside feed fills wrap fully */
@@ -676,29 +697,29 @@ html, body {
 .feed-card-wrap .hero-card {
   width: 100%;
   height: 100%;
-  min-height: 340px;
-}
-
-.feed-card-wrap:first-child .hero-card {
-  min-height: 480px;
 }
 
 @media (max-width: 1023px) {
   .news-feed {
-    grid-template-columns: 1fr;
-    padding: 24px 12px 60px;
-    gap: 12px;
+    grid-template-columns: repeat(2, 1fr);
+    grid-auto-rows: auto;
+    padding: 20px 12px 60px;
+    gap: 10px;
   }
-  .news-feed .feed-card-wrap:first-child {
-    grid-column: 1;
+  /* Reset all nth-child sizing on mobile — simple 2-col */
+  .feed-card-wrap:nth-child(n) {
+    grid-column: span 1;
+    grid-row: span 1;
   }
+  /* First card still slightly bigger */
+  .feed-card-wrap:first-child { grid-column: span 2; }
   .feed-card-wrap .card,
-  .feed-card-wrap .hero-card { min-height: 280px; }
-  .feed-card-wrap:first-child .hero-card { min-height: 360px; }
+  .feed-card-wrap .hero-card { min-height: 260px; }
+  .feed-card-wrap:first-child .hero-card { min-height: 320px; }
 }
 
 @media (min-width: 1024px) and (max-width: 1280px) {
-  .news-feed { grid-template-columns: repeat(2, 1fr); }
+  .news-feed { grid-auto-rows: 70px; }
 }
 
 

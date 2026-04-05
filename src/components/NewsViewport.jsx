@@ -10,51 +10,28 @@ import SkeletonCard from './SkeletonCard.jsx';
 export default function NewsViewport({ articles, loading, language }) {
   const feedRef = useRef(null);
 
-  // Scroll-reveal: watch every .card and add .card--visible when it enters viewport
+  // Holographic appear: watch every feed-card-wrap and trigger animation when in view
   useEffect(() => {
     const feed = feedRef.current;
     if (!feed) return;
 
-    const observer = new IntersectionObserver(
-      entries => {
-        entries.forEach(entry => {
-          if (entry.isIntersecting) {
-            entry.target.classList.add('card--visible');
-            observer.unobserve(entry.target); // fire once
-          }
-        });
-      },
-      { threshold: 0.08 }
-    );
-
-    const cards = feed.querySelectorAll('.card');
-    cards.forEach(card => observer.observe(card));
-
-    return () => observer.disconnect();
-  }, [articles, loading]);
-
-  // Re-run observer when new cards appear after articles load
-  useEffect(() => {
-    if (loading) return;
-    const feed = feedRef.current;
-    if (!feed) return;
-
-    // Small delay to let DOM settle
     const id = setTimeout(() => {
       const observer = new IntersectionObserver(
         entries => {
           entries.forEach(entry => {
             if (entry.isIntersecting) {
-              entry.target.classList.add('card--visible');
+              entry.target.classList.add('card-appeared');
+              // Also mark inner card for flicker CSS
+              entry.target.querySelector('.card')?.classList.add('card--visible');
               observer.unobserve(entry.target);
             }
           });
         },
-        { threshold: 0.08 }
+        { threshold: 0.06 }
       );
-      feed.querySelectorAll('.card:not(.card--visible)').forEach(c => observer.observe(c));
+      feed.querySelectorAll('.feed-card-wrap:not(.card-appeared)').forEach(w => observer.observe(w));
       return () => observer.disconnect();
-    }, 100);
+    }, 80);
 
     return () => clearTimeout(id);
   }, [articles, loading]);

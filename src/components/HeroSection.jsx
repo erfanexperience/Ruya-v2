@@ -44,33 +44,6 @@ export default function HeroSection({ language }) {
           )}
         </h1>
 
-        <p className="hero-sub">
-          {isArabic
-            ? 'تغطية لحظية للذكاء الاصطناعي ورؤية 2030 والتقنية السعودية — مدعومة بالذكاء الاصطناعي'
-            : 'Real-time coverage of AI, Vision 2030 & Saudi tech — curated and summarised by AI across 9 live sources'}
-        </p>
-
-        <div className="hero-stats">
-          <div className="hero-stat">
-            <span className="hero-stat-value">9</span>
-            <span className="hero-stat-label">{isArabic ? 'مصادر مباشرة' : 'Live Sources'}</span>
-          </div>
-          <div className="hero-stat-divider" />
-          <div className="hero-stat">
-            <span className="hero-stat-value">24h</span>
-            <span className="hero-stat-label">{isArabic ? 'تحديث كل' : 'Auto Refresh'}</span>
-          </div>
-          <div className="hero-stat-divider" />
-          <div className="hero-stat">
-            <span className="hero-stat-value">AI</span>
-            <span className="hero-stat-label">{isArabic ? 'ملخصات' : 'Summaries'}</span>
-          </div>
-        </div>
-
-        <div className="hero-scroll-hint">
-          <span>{isArabic ? 'اسحب للأسفل' : 'Scroll for news'}</span>
-          <div className="hero-scroll-arrow" />
-        </div>
       </div>
 
       {/* RIGHT — 3D robot */}
