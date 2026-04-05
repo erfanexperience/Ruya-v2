@@ -159,8 +159,8 @@ export default function LoadingScreen({ isReady, onDone }) {
       <div className="loading-center">
         <div className="loading-logo-wrap">
           <img
-            src={`${import.meta.env.BASE_URL}Assets/Logo.webp`}
-            alt="Ru'ya"
+            src={`${import.meta.env.BASE_URL}Assets/Logo-v2.webp`}
+            alt="TAITAN Pulse"
             className="loading-logo"
           />
           <div className="loading-logo-ring" />
@@ -168,9 +168,8 @@ export default function LoadingScreen({ isReady, onDone }) {
         </div>
 
         <div className="loading-brand">
-          <span className="loading-brand-en">Ru'ya</span>
-          <span className="loading-brand-divider">|</span>
-          <span className="loading-brand-ar">رؤية</span>
+          <span className="loading-brand-taitan">TAITAN</span>
+          <span className="loading-brand-pulse"> Pulse</span>
         </div>
 
         <div className="loading-tagline">

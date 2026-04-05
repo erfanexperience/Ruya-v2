@@ -38,8 +38,10 @@
 }
 
 html, body {
-  height: 100%;
-  overflow: hidden;
+  height: auto;
+  min-height: 100%;
+  overflow-x: hidden;
+  overflow-y: auto;
   background: var(--bg-primary);
   color: var(--text-primary);
   font-family: var(--font-body);
@@ -47,18 +49,11 @@ html, body {
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-}
-
-/* Mobile: allow scroll */
-@media (max-width: 1023px) {
-  html, body {
-    overflow: auto;
-    height: auto;
-  }
+  scroll-behavior: smooth;
 }
 
 #root {
-  height: 100%;
+  min-height: 100%;
   display: flex;
   flex-direction: column;
   position: relative;
@@ -72,10 +67,9 @@ html, body {
 
 /* ─── App Layout ─────────────────────────────────────────────────────────── */
 .app {
-  height: 100vh;
-  display: grid;
-  grid-template-rows: var(--header-height) var(--topnav-height) 1fr;
-  overflow: hidden;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
   position: relative;
 }
 
@@ -83,12 +77,6 @@ html, body {
   :root {
     --header-height: 56px;
     --topnav-height: 44px;
-  }
-  .app {
-    height: auto;
-    min-height: 100dvh;
-    overflow: visible;
-    grid-template-rows: var(--header-height) var(--topnav-height) auto;
   }
 }
 
@@ -126,7 +114,8 @@ html, body {
    HEADER
    ═══════════════════════════════════════════════════════════════════ */
 .header {
-  position: relative;
+  position: sticky;
+  top: 0;
   z-index: 100;
   height: var(--header-height);
   display: flex;
@@ -183,29 +172,28 @@ html, body {
 }
 
 .header-brand {
-  font-family: var(--font-display);
-  font-size: 15px;
-  font-weight: 700;
-  color: var(--accent-cyan);
-  text-shadow: 0 0 20px rgba(0, 212, 255, 0.5), 0 0 40px rgba(0, 212, 255, 0.2);
-  letter-spacing: 0.08em;
+  display: flex;
+  align-items: baseline;
+  gap: 2px;
   white-space: nowrap;
 }
 
-.header-by-taitan {
-  font-size: 10px;
-  color: var(--text-muted);
-  letter-spacing: 0.04em;
-  line-height: 1;
-  white-space: nowrap;
-}
-
-.header-by-taitan strong {
+.brand-taitan {
   font-family: 'Playfair Display', Georgia, serif;
   font-weight: 900;
-  font-size: 11px;
-  color: var(--text-secondary);
-  letter-spacing: 0.12em;
+  font-size: 16px;
+  color: var(--accent-cyan);
+  text-shadow: 0 0 20px rgba(0, 212, 255, 0.5), 0 0 40px rgba(0, 212, 255, 0.2);
+  letter-spacing: 0.1em;
+}
+
+.brand-pulse {
+  font-family: 'Caveat', cursive;
+  font-weight: 600;
+  font-size: 20px;
+  color: #FFD94A;
+  text-shadow: 0 0 16px rgba(255, 217, 74, 0.5);
+  letter-spacing: 0.02em;
 }
 
 .header-center {
@@ -328,7 +316,8 @@ html, body {
    TOPIC NAV
    ═══════════════════════════════════════════════════════════════════ */
 .topic-nav {
-  position: relative;
+  position: sticky;
+  top: var(--header-height);
   z-index: 90;
   height: var(--topnav-height);
   display: flex;
@@ -395,134 +384,321 @@ html, body {
 }
 
 /* ═══════════════════════════════════════════════════════════════════
-   NEWS VIEWPORT (Desktop: horizontal scroll-snap)
+   HERO SECTION — full-viewport split: 60% copy / 40% robot
    ═══════════════════════════════════════════════════════════════════ */
-.news-viewport-wrapper {
+.hero-section {
   position: relative;
-  z-index: 10;
-  flex: 1;
-  overflow: hidden;
-  height: var(--viewport-height);
-}
-
-.news-viewport {
+  min-height: 100vh;
   display: flex;
-  height: 100%;
-  overflow-x: auto;
-  overflow-y: hidden;
-  scroll-snap-type: x mandatory;
-  scroll-behavior: smooth;
-  scrollbar-width: none;
-  padding: 12px 16px;
-  gap: 12px;
-  position: relative;
-  z-index: 2;
-  pointer-events: none;
+  align-items: center;
+  overflow: hidden;
+  padding: 0 48px;
+  gap: 0;
 }
 
-.news-viewport::-webkit-scrollbar { display: none; }
+/* LEFT — heading copy */
+.hero-copy {
+  flex: 0 0 58%;
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+  padding: 80px 0 80px;
+  z-index: 2;
+}
 
-/* Scroll progress bar */
-.scroll-progress {
+.hero-eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--font-display);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.25em;
+  color: var(--accent-cyan);
+  text-transform: uppercase;
+}
+
+.hero-eyebrow-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent-cyan);
+  box-shadow: 0 0 8px var(--accent-cyan);
+  animation: livePulse 2s ease-in-out infinite;
+}
+
+.hero-heading {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.hero-heading-line {
+  font-family: var(--font-display);
+  font-size: clamp(36px, 4.5vw, 64px);
+  font-weight: 800;
+  color: var(--text-primary);
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  display: block;
+}
+
+.hero-heading-line.accent {
+  color: transparent;
+  -webkit-text-stroke: 1px var(--accent-cyan);
+  text-shadow: 0 0 40px rgba(0, 212, 255, 0.3);
+}
+
+.hero-sub {
+  font-size: clamp(13px, 1.2vw, 16px);
+  color: var(--text-secondary);
+  line-height: 1.7;
+  max-width: 520px;
+  letter-spacing: 0.01em;
+}
+
+.hero-stats {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+}
+
+.hero-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.hero-stat-value {
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--accent-cyan);
+  line-height: 1;
+}
+
+.hero-stat-label {
+  font-size: 10px;
+  color: var(--text-muted);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.hero-stat-divider {
+  width: 1px;
+  height: 32px;
+  background: var(--border-glow);
+}
+
+.hero-scroll-hint {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.hero-scroll-hint span {
+  font-family: var(--font-display);
+  font-size: 9px;
+  letter-spacing: 0.2em;
+  color: var(--text-muted);
+  text-transform: uppercase;
+}
+
+.hero-scroll-arrow {
+  width: 20px;
+  height: 30px;
+  border: 1px solid var(--border-glow);
+  border-radius: 10px;
+  position: relative;
+}
+
+.hero-scroll-arrow::after {
+  content: '';
+  position: absolute;
+  top: 5px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 3px;
+  height: 8px;
+  background: var(--accent-cyan);
+  border-radius: 2px;
+  animation: scrollDot 1.5s ease-in-out infinite;
+}
+
+@keyframes scrollDot {
+  0%   { opacity: 1; transform: translateX(-50%) translateY(0); }
+  100% { opacity: 0; transform: translateX(-50%) translateY(10px); }
+}
+
+/* RIGHT — 3D robot */
+.hero-robot {
+  flex: 0 0 42%;
+  position: relative;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.hero-robot-inner {
+  position: absolute;
+  inset: -10% -5%;
+  transform: scale(1.2) translateY(-5%);
+  transform-origin: center top;
+}
+
+.hero-spline {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+.hero-robot-fallback {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+}
+
+/* Decorative lines on hero */
+.hero-section::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 42%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--accent-cyan), transparent);
+  opacity: 0.3;
+}
+
+.hero-section::after {
+  content: '';
   position: absolute;
   bottom: 0;
   left: 0;
-  height: 2px;
-  background: linear-gradient(90deg, var(--accent-cyan), var(--accent-green));
-  box-shadow: 0 0 8px var(--accent-cyan);
-  transition: width 0.1s linear;
-  border-radius: 2px;
-  z-index: 20;
+  right: 42%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--accent-cyan), transparent);
+  opacity: 0.15;
 }
 
-/* Nav arrows */
-.viewport-arrow {
-  position: absolute;
-  top: 50%;
-  transform: translateY(-50%);
-  z-index: 30;
-  width: 36px;
-  height: 64px;
+/* Mobile hero */
+@media (max-width: 1023px) {
+  .hero-section {
+    flex-direction: column;
+    min-height: auto;
+    padding: 80px 20px 40px;
+    gap: 0;
+  }
+  .hero-copy {
+    flex: unset;
+    width: 100%;
+    padding: 0;
+    gap: 20px;
+  }
+  .hero-robot {
+    flex: unset;
+    width: 100%;
+    height: 50vw;
+    min-height: 260px;
+  }
+  .hero-robot-inner {
+    inset: 0;
+    transform: none;
+  }
+  .hero-heading-line { font-size: clamp(28px, 8vw, 44px); }
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   NEWS FEED — vertical scrolling card grid
+   ═══════════════════════════════════════════════════════════════════ */
+.news-feed {
+  width: 100%;
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 48px 32px 80px;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+
+/* First card (hero) spans full width */
+.news-feed .feed-card-wrap:first-child {
+  grid-column: 1 / -1;
+}
+
+/* Scroll-reveal: cards start invisible and slide up */
+.feed-card-wrap {
+  opacity: 0;
+  transform: translateY(32px);
+  transition:
+    opacity 0.55s var(--ease-out-expo),
+    transform 0.55s var(--ease-out-expo);
+  transition-delay: calc(var(--card-index, 0) * 40ms);
+}
+
+/* Triggered by IntersectionObserver in NewsViewport */
+.feed-card-wrap .card--visible,
+.feed-card-wrap:has(.card--visible) {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Also animate the feed-card-wrap itself when child card is visible */
+.feed-card-wrap:has(.card.card--visible) {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Fallback for browsers without :has — make wrap visible when card is visible */
+.card--visible {
+  opacity: 1 !important;
+  transform: translateY(0) !important;
+}
+
+/* Override: feed-card-wrap visibility driven by JS adding card--visible */
+.feed-card-wrap { will-change: opacity, transform; }
+
+.news-feed--empty {
+  min-height: 40vh;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(0, 212, 255, 0.08);
-  border: 1px solid var(--border-glow);
-  cursor: pointer;
-  transition: all 0.3s var(--ease-out-expo);
-  backdrop-filter: blur(8px);
-  color: var(--accent-cyan);
-  font-size: 18px;
+  grid-template-columns: 1fr;
 }
 
-.viewport-arrow:hover {
-  background: rgba(0, 212, 255, 0.15);
-  border-color: var(--accent-cyan-dim);
-  box-shadow: 0 0 20px rgba(0, 212, 255, 0.2);
-}
-
-.viewport-arrow.left  { left: 0; border-radius: 0 6px 6px 0; }
-.viewport-arrow.right { right: 0; border-radius: 6px 0 0 6px; }
-
-
-/* ═══════════════════════════════════════════════════════════════════
-   VIEWPORT PAGE (snap unit)
-   ═══════════════════════════════════════════════════════════════════ */
-/* ─── Bento layout: 6 news cards + robot in center ───────────────────────────
-   Columns: 1.8fr   1.1fr   1.2fr
-   Rows:    1.2fr   1fr     0.9fr
-
-   ┌────────────┬───────────┬───────────┐
-   │    hero    │  card2    │  card3    │  row 1 (tall)
-   │ (rows 1-2) ├───────────┤  card4a   │  row 2
-   │            │  ROBOT    │           │
-   ├────────────┤ (rows 2-3)├───────────┤
-   │   card5    │           │  card4b   │  row 3 (+10%)
-   └────────────┴───────────┴───────────┘
-*/
-.viewport-page {
-  flex-shrink: 0;
-  display: grid;
-  grid-template-columns: 1.55fr 1.1fr 1.2fr;
-  grid-template-rows: 1.21fr 1fr 1.08fr;
-  grid-template-areas:
-    "hero  card2  card3"
-    "hero  robot  card4a"
-    "card5 robot  card4b";
-  gap: 10px;
+/* Card inside feed fills wrap fully */
+.feed-card-wrap .card,
+.feed-card-wrap .hero-card {
+  width: 100%;
   height: 100%;
-  width: calc(100vw - 48px);
-  scroll-snap-align: start;
-  animation: pageSlideIn 0.35s var(--ease-out-expo) both;
-  pointer-events: none;
+  min-height: 340px;
 }
 
-/* Each slot fills its grid area fully */
-.viewport-page > div {
-  min-height: 0;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
+.feed-card-wrap:first-child .hero-card {
+  min-height: 480px;
 }
 
-.viewport-page > div > .card,
-.viewport-page > div > .hero-card {
-  flex: 1;
-  height: 100%;
+@media (max-width: 1023px) {
+  .news-feed {
+    grid-template-columns: 1fr;
+    padding: 24px 12px 60px;
+    gap: 12px;
+  }
+  .news-feed .feed-card-wrap:first-child {
+    grid-column: 1;
+  }
+  .feed-card-wrap .card,
+  .feed-card-wrap .hero-card { min-height: 280px; }
+  .feed-card-wrap:first-child .hero-card { min-height: 360px; }
 }
 
-@keyframes pageSlideIn {
-  from { opacity: 0; transform: translateX(40px); }
-  to   { opacity: 1; transform: translateX(0); }
-}
-
-.viewport-page.slide-out {
-  animation: pageSlideOut 0.2s var(--ease-in-out) both;
-}
-
-@keyframes pageSlideOut {
-  from { opacity: 1; transform: translateX(0); }
-  to   { opacity: 0; transform: translateX(-40px); }
+@media (min-width: 1024px) and (max-width: 1280px) {
+  .news-feed { grid-template-columns: repeat(2, 1fr); }
 }
 
 
@@ -541,9 +717,6 @@ html, body {
     box-shadow 0.3s var(--ease-out-expo),
     transform 0.2s var(--ease-out-expo);
   will-change: transform;
-  /* Card entrance */
-  opacity: 0;
-  animation: cardMaterialize 0.5s var(--ease-out-expo) forwards;
 }
 
 /* Top edge glow line */
@@ -613,17 +786,9 @@ html, body {
   100% { filter: brightness(1) saturate(1); }
 }
 
-.card.flicker {
-  animation:
-    cardMaterialize 0.5s var(--ease-out-expo) forwards,
-    holoFlicker 0.6s ease forwards 0.5s;
-}
-
-/* Pause card animations while the app is still hidden behind the loading screen.
-   When .app--visible is added, animations resume from their starting point
-   so users see the full materialize + flicker sequence on first reveal. */
-.app:not(.app--visible) .card {
-  animation-play-state: paused;
+/* Holographic flicker fires once when card becomes visible */
+.card.flicker.card--visible {
+  animation: holoFlicker 0.7s ease 0.1s both;
 }
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -1097,12 +1262,6 @@ html, body {
 [dir="rtl"] .header-clock { align-items: flex-start; }
 [dir="rtl"] .news-card-meta { flex-direction: row-reverse; }
 [dir="rtl"] .news-card-footer { flex-direction: row-reverse; }
-/* RTL viewport: direction:rtl flips scrollLeft semantics so page 0 stays visible first */
-[dir="rtl"] .news-viewport { direction: rtl; }
-[dir="rtl"] .viewport-page { direction: ltr; } /* restore LTR inside each page */
-/* Arrows swap sides */
-[dir="rtl"] .viewport-arrow.left  { left: auto; right: 0; border-radius: 6px 0 0 6px; }
-[dir="rtl"] .viewport-arrow.right { right: auto; left: 0; border-radius: 0 6px 6px 0; }
 /* Topic nav: direction:rtl makes flex flow right→left and scroll start at right edge */
 [dir="rtl"] .topic-nav { direction: rtl; justify-content: flex-start; }
 [dir="rtl"] .topic-btn  { direction: rtl; }
@@ -1119,8 +1278,6 @@ html, body {
     height: 56px;
   }
   .header-logo { height: 32px; }
-  .header-brand { font-size: 11px; letter-spacing: 0.04em; }
-  .header-by-taitan { font-size: 8.5px; }
   .header-center { display: none; }
   .header-clock { display: none; }
   .lang-option { padding: 4px 9px; font-size: 9px; }
@@ -1177,40 +1334,9 @@ html, body {
   .news-card-summary { font-size: 13px; }
   .news-card-meta { font-size: 10px; }
 
-  /* ── Animations — simpler on mobile ───────────────────────── */
-  .card { animation: cardMaterialize 0.4s var(--ease-out-expo) forwards; }
-
-  /* ── Viewport — full-width vertical feed ──────────────────── */
-  .news-viewport-wrapper {
-    height: auto;
-    overflow: visible;
-    /* reset desktop z-index tricks — not needed on mobile */
-    z-index: auto;
-  }
-  .news-viewport {
-    flex-direction: column;
-    overflow: visible;
-    scroll-snap-type: none;
-    height: auto;
-    padding: 10px 12px 24px;
-    gap: 10px;
-    pointer-events: auto;
-    position: static;
-    z-index: auto;
-  }
-  .viewport-page {
-    display: flex;
-    flex-direction: column;
-    width: 100%;
-    height: auto;
-    scroll-snap-align: none;
-    grid-template-areas: none;
-    pointer-events: auto;
-    gap: 10px;
-  }
-  .viewport-page > div { height: auto; }
-  .viewport-arrow { display: none; }
-  .scroll-progress { display: none; }
+  /* ── Brand sizes ────────────────────────────────────────────── */
+  .brand-taitan { font-size: 13px; }
+  .brand-pulse  { font-size: 16px; }
 }
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -1325,29 +1451,26 @@ html, body {
 /* ─── Brand name ──────────────────────────────────────────────────── */
 .loading-brand {
   display: flex;
-  align-items: center;
-  gap: 10px;
-  font-family: var(--font-display);
-  font-size: 26px;
-  font-weight: 800;
-  letter-spacing: 0.06em;
+  align-items: baseline;
+  gap: 4px;
 }
 
-.loading-brand-en {
+.loading-brand-taitan {
+  font-family: 'Playfair Display', Georgia, serif;
+  font-weight: 900;
+  font-size: 28px;
   color: var(--accent-cyan);
   text-shadow: 0 0 24px rgba(0, 212, 255, 0.6), 0 0 60px rgba(0, 212, 255, 0.2);
+  letter-spacing: 0.1em;
 }
 
-.loading-brand-divider {
-  color: var(--text-muted);
-  font-weight: 300;
-}
-
-.loading-brand-ar {
-  color: var(--text-primary);
-  font-family: var(--font-body);
-  font-size: 22px;
-  font-weight: 700;
+.loading-brand-pulse {
+  font-family: 'Caveat', cursive;
+  font-weight: 600;
+  font-size: 36px;
+  color: #FFD94A;
+  text-shadow: 0 0 20px rgba(255, 217, 74, 0.5);
+  letter-spacing: 0.02em;
 }
 
 /* ─── Pulsing dots ────────────────────────────────────────────────── */

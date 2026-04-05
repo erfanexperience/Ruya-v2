@@ -1,11 +1,12 @@
-// App.jsx
-// Root layout — wires together all hooks, components, background
+// App.jsx — TAITAN Pulse
+// Layout: fixed header → sticky topic nav → hero section → vertical news feed
 
 import { useState } from 'react';
 import './styles.css';
 import ParticleBackground from './components/ParticleBackground.jsx';
 import Header from './components/Header.jsx';
 import TopicNav from './components/TopicNav.jsx';
+import HeroSection from './components/HeroSection.jsx';
 import NewsViewport from './components/NewsViewport.jsx';
 import LoadingScreen from './components/LoadingScreen.jsx';
 import { useNews } from './hooks/useNews.js';
@@ -15,20 +16,17 @@ export default function App() {
   const { language, toggleLanguage } = useLanguage();
   const [showApp, setShowApp] = useState(false);
 
-  // News fetching starts immediately — in the background while loading screen shows
   const {
     articles,
     loading,
     error,
     activeTopic,
     setActiveTopic,
-    articleCount,
-    lastFetchTime,
   } = useNews();
 
   return (
     <>
-      {/* Loading screen — stays for ≥3s, fades out when news is ready */}
+      {/* Loading screen */}
       {!showApp && (
         <LoadingScreen
           isReady={!loading}
@@ -36,27 +34,34 @@ export default function App() {
         />
       )}
 
-      {/* Fixed background layers — always rendered so they're ready */}
+      {/* Fixed background layers */}
       <div className="bg-grid" aria-hidden="true" />
       <ParticleBackground />
 
-      {/* App shell — rendered in background immediately, visible after loading */}
+      {/* App shell */}
       <div className={`app${showApp ? ' app--visible' : ''}`} style={{ visibility: showApp ? 'visible' : 'hidden' }}>
+
+        {/* Fixed header */}
         <Header
           language={language}
           onToggleLanguage={toggleLanguage}
-          articleCount={articleCount}
-          lastFetchTime={lastFetchTime}
         />
 
+        {/* Sticky topic nav */}
         <TopicNav
           activeTopic={activeTopic}
           onTopicChange={setActiveTopic}
           language={language}
         />
 
+        {/* Hero — only on "all" tab */}
+        {activeTopic === 'all' && (
+          <HeroSection language={language} />
+        )}
+
+        {/* Vertical news feed */}
         {error ? (
-          <div className="empty-state" style={{ color: 'var(--accent-orange)' }}>
+          <div className="empty-state" style={{ minHeight: '40vh', color: 'var(--accent-orange)' }}>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
               <circle cx="12" cy="12" r="10" />
               <line x1="12" y1="8" x2="12" y2="12" />
@@ -71,7 +76,6 @@ export default function App() {
             articles={articles}
             loading={loading}
             language={language}
-            activeTopic={activeTopic}
           />
         )}
       </div>

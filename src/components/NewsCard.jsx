@@ -11,7 +11,7 @@ export default function NewsCard({ article, index = 0, language = 'en', size = '
   const [translated, setTranslated] = useState(null);
   const [translating, setTranslating] = useState(false);
   const [imgLoaded, setImgLoaded] = useState(false);
-  const [hasFlickered, setHasFlickered] = useState(false);
+  const hasFlickered = true; // always apply flicker class; CSS fires it on card--visible
 
   const cardRef = useRef(null);
   const imgRef = useRef(null);
@@ -29,12 +29,8 @@ export default function NewsCard({ article, index = 0, language = 'en', size = '
 
   const targetLang = language === 'ar' ? 'Arabic' : 'English';
 
-  useEffect(() => {
-    if (!hasFlickered) {
-      const timer = setTimeout(() => setHasFlickered(true), 50);
-      return () => clearTimeout(timer);
-    }
-  }, [hasFlickered]);
+  // flicker class is applied immediately; card--visible is added by NewsViewport's IntersectionObserver
+  // which triggers holoFlicker via .card.flicker.card--visible CSS rule
 
   useEffect(() => {
     const img = imgRef.current;
