@@ -10,30 +10,30 @@ import SkeletonCard from './SkeletonCard.jsx';
 export default function NewsViewport({ articles, loading, language }) {
   const feedRef = useRef(null);
 
-  // Holographic appear: watch every feed-card-wrap and trigger animation when in view
+  // For cards below the fold, add card-appeared when they scroll into view
   useEffect(() => {
+    if (loading || articles.length === 0) return;
     const feed = feedRef.current;
     if (!feed) return;
 
-    const id = setTimeout(() => {
-      const observer = new IntersectionObserver(
-        entries => {
-          entries.forEach(entry => {
-            if (entry.isIntersecting) {
-              entry.target.classList.add('card-appeared');
-              // Also mark inner card for flicker CSS
-              entry.target.querySelector('.card')?.classList.add('card--visible');
-              observer.unobserve(entry.target);
-            }
-          });
-        },
-        { threshold: 0.06 }
-      );
-      feed.querySelectorAll('.feed-card-wrap:not(.card-appeared)').forEach(w => observer.observe(w));
-      return () => observer.disconnect();
-    }, 80);
+    const observer = new IntersectionObserver(
+      entries => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('card-appeared');
+            observer.unobserve(entry.target);
+          }
+        });
+      },
+      { threshold: 0.05, rootMargin: '0px 0px 100px 0px' }
+    );
 
-    return () => clearTimeout(id);
+    // Only observe wraps that don't already have the class (below-fold cards)
+    const id = setTimeout(() => {
+      feed.querySelectorAll('.feed-card-wrap:not(.card-appeared)').forEach(w => observer.observe(w));
+    }, 50);
+
+    return () => { clearTimeout(id); observer.disconnect(); };
   }, [articles, loading]);
 
   if (loading) {
@@ -65,7 +65,7 @@ export default function NewsViewport({ articles, loading, language }) {
     <div className="news-feed" ref={feedRef}>
       {articles.map((article, index) => (
         <div
-          className="feed-card-wrap"
+          className="feed-card-wrap card-appeared"
           key={article.id || article.url || index}
           style={{ '--card-index': index }}
         >

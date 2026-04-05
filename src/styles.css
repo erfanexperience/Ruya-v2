@@ -675,7 +675,6 @@ html, body {
 }
 
 .feed-card-wrap {
-  opacity: 0;
   will-change: opacity, transform;
 }
 
