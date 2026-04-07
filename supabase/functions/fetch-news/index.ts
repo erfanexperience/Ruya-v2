@@ -341,7 +341,7 @@ function deduplicateArticles(articles: Article[]): Article[] {
 // ─── Gemini helpers ───────────────────────────────────────────────────────────
 
 const VALID_TAGS = ['Vision 2030','AI & Robotics','NEOM & Giga Projects','Startups','Cybersecurity','Telecom & 5G','Gaming & Entertainment','General']
-const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent'
+const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent'
 
 async function callGemini(prompt: string, key: string, maxTokens = 64): Promise<string> {
   const res = await fetch(`${GEMINI_URL}?key=${key}`, {
