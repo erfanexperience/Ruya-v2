@@ -260,8 +260,8 @@ export default function AdminPage() {
               try {
                 const res = await triggerTranslateArticles(ADMIN_PASSWORD);
                 setTranslateResult({
-                  success: true,
-                  message: res.message || `Translated ${res.translated} articles. Failed: ${res.failed}.`,
+                  success: res.translated > 0,
+                  message: res.message || `Translated ${res.translated} articles. Failed: ${res.failed}.${res.lastError ? ' Error: ' + res.lastError : ''}`,
                 });
                 await loadStats();
               } catch (e) {

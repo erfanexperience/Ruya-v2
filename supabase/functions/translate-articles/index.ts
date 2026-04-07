@@ -99,6 +99,7 @@ Deno.serve(async (req) => {
 
   let translated = 0
   let failed = 0
+  let lastError = ''
 
   for (const article of articles) {
     try {
@@ -113,26 +114,29 @@ Deno.serve(async (req) => {
 
         if (updateError) {
           console.warn('[translate-articles] Update failed:', updateError.message)
+          lastError = updateError.message
           failed++
         } else {
           translated++
         }
       } else {
+        lastError = 'JSON parse failed'
         failed++
       }
     } catch (e: any) {
+      lastError = e.message
       console.warn('[translate-articles] Translation failed for:', article.title, e.message)
       failed++
     }
 
-    // 1.2s delay to respect Gemini free tier rate limit (15 RPM)
-    await new Promise(r => setTimeout(r, 1200))
+    // 2s delay to respect Gemini free tier rate limit (15 RPM)
+    await new Promise(r => setTimeout(r, 2000))
   }
 
   console.log(`[translate-articles] Done: ${translated} translated, ${failed} failed`)
 
   return new Response(
-    JSON.stringify({ success: true, translated, failed, remaining: articles.length - translated }),
+    JSON.stringify({ success: true, translated, failed, lastError, remaining: articles.length - translated }),
     { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
   )
 })
