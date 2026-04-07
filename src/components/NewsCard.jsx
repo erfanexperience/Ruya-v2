@@ -1,38 +1,43 @@
 // NewsCard.jsx
-// layout="horizontal" → image 30% left, content 70% right (for short bento slots)
+// layout="horizontal" → image 30% left, content 70% right
 // layout="vertical"   → default stacked layout
+// Arabic translations served from DB (title_ar / summary_ar) — no on-demand API calls
 
-import { useState, useRef, useEffect, useCallback } from 'react';
-// imgRef removed — lazy loading now uses native loading="lazy" attribute
-import { translateArticle } from '../services/geminiService.js';
+import { useState, useRef, useEffect } from 'react';
 import { timeAgo, truncate, getFallbackImage, staggerDelay } from '../utils/helpers.js';
 
 export default function NewsCard({ article, index = 0, language = 'en', size = 'normal', layout = 'vertical', onSelect }) {
-  const [isFlipped, setIsFlipped] = useState(false);
-  const [translated, setTranslated] = useState(null);
-  const [translating, setTranslating] = useState(false);
-  const [imgLoaded, setImgLoaded] = useState(false);
-  const [imgError, setImgError] = useState(false);
-  const hasFlickered = true; // always apply flicker class; CSS fires it on card--visible
+  const [isFlipped, setIsFlipped]   = useState(false);
+  const [imgLoaded, setImgLoaded]   = useState(false);
+  const [imgError, setImgError]     = useState(false);
 
-  const cardRef = useRef(null);
-  const magnetRef = useRef({ x: 0, y: 0, rafId: null });
+  const cardRef    = useRef(null);
+  const magnetRef  = useRef({ x: 0, y: 0, rafId: null });
 
-  const title = article.title || '';
-  const summary = article.summary || article.description || '';
-  const source = article.source || '';
-  const tag = article.tag || '';
-  const url = article.url || '#';
-  const image = article.image || getFallbackImage(title);
-  const publishedAt = article.publishedAt;
+  const isArabic     = language === 'ar';
   const isHorizontal = layout === 'horizontal';
-  const isWide = size === 'wide';
+  const isWide       = size === 'wide';
 
-  const targetLang = language === 'ar' ? 'Arabic' : 'English';
+  // Pick the right language content — fall back to English if Arabic not yet translated
+  const title   = isArabic ? (article.title_ar   || article.title)   : article.title;
+  const summary = isArabic ? (article.summary_ar  || article.summary) : article.summary;
+  // Flip side shows the other language
+  const flipTitle   = isArabic ? article.title   : (article.title_ar   || article.title);
+  const flipSummary = isArabic ? article.summary  : (article.summary_ar || article.summary);
 
-  // flicker class is applied immediately; card--visible is added by NewsViewport's IntersectionObserver
-  // which triggers holoFlicker via .card.flicker.card--visible CSS rule
+  const source      = article.source      || '';
+  const tag         = article.tag         || '';
+  const image       = article.image       || getFallbackImage(article.title);
+  const publishedAt = article.publishedAt;
 
+  // Flip label
+  const flipLabel = isFlipped
+    ? (isArabic ? 'رجوع' : 'Back')
+    : (isArabic ? 'EN' : 'AR');
+
+  const hasOtherLang = isArabic ? !!article.title_ar : !!article.title_ar;
+
+  // Magnetic effect
   useEffect(() => {
     const card = cardRef.current;
     if (!card) return;
@@ -60,53 +65,37 @@ export default function NewsCard({ article, index = 0, language = 'en', size = '
     };
   }, []);
 
-  const handleTranslate = useCallback(async (e) => {
-    e.stopPropagation();
-    if (isFlipped) { setIsFlipped(false); return; }
-    setIsFlipped(true);
-    if (!translated) {
-      setTranslating(true);
-      try {
-        const result = await translateArticle({ ...article, summary }, targetLang);
-        setTranslated(result);
-      } catch (err) {
-        console.warn('[Ruya] Translation error:', err.message);
-        setTranslated({ title, summary: 'Translation unavailable.' });
-      } finally {
-        setTranslating(false);
-      }
-    }
-  }, [isFlipped, translated, article, summary, targetLang, title]);
-
-  const flipLabel = isFlipped
-    ? (language === 'ar' ? 'رجوع' : 'Back')
-    : (language === 'ar' ? 'ترجمة EN' : 'Translate AR');
-
-  const cardClass = [
-    'card news-card',
-    hasFlickered ? 'flicker' : '',
-    isWide ? 'news-card--wide' : '',
-    isHorizontal ? 'news-card--horizontal' : '',
-  ].filter(Boolean).join(' ');
+  // Reset flip when language changes
+  useEffect(() => { setIsFlipped(false); }, [language]);
 
   function handleCardClick(e) {
     if (e.target.closest('button, a')) return;
     if (onSelect) onSelect(article);
   }
 
-  // ── HORIZONTAL layout (30/70) ──────────────────────────────────────
+  function handleFlip(e) {
+    e.stopPropagation();
+    setIsFlipped(f => !f);
+  }
+
+  const cardClass = [
+    'card news-card flicker',
+    isWide       ? 'news-card--wide'       : '',
+    isHorizontal ? 'news-card--horizontal' : '',
+  ].filter(Boolean).join(' ');
+
+  // ── HORIZONTAL layout ──────────────────────────────────────────────────────
   if (isHorizontal) {
     return (
       <div
         ref={cardRef}
         className={cardClass}
-        style={{ animationDelay: staggerDelay(index, 100), cursor: 'pointer' }}
+        style={{ animationDelay: staggerDelay(index, 100), cursor: 'pointer', direction: isArabic ? 'rtl' : 'ltr' }}
         onClick={handleCardClick}
       >
         <div className={`news-card-flip${isFlipped ? ' flipped' : ''}`}>
           {/* FRONT */}
           <div className="news-card-front news-card-front--h">
-            {/* Image — 30% */}
             {!imgError && (
               <div className="news-card-img-h">
                 <img
@@ -119,7 +108,6 @@ export default function NewsCard({ article, index = 0, language = 'en', size = '
                 />
               </div>
             )}
-            {/* Content — 70% */}
             <div className="news-card-content-h">
               <div className="news-card-body">
                 <div className="news-card-meta">
@@ -132,31 +120,22 @@ export default function NewsCard({ article, index = 0, language = 'en', size = '
               </div>
             </div>
           </div>
-
-          {/* BACK — translated */}
-          <div className="news-card-back">
-            {translating ? (
-              <div className="translation-spinner">
-                {language === 'ar' ? 'جارٍ الترجمة...' : 'Translating...'}
-              </div>
-            ) : translated ? (
-              <>
-                <p className="translated-title">{translated.title}</p>
-                <p className="translated-summary">{translated.summary}</p>
-              </>
-            ) : null}
+          {/* BACK — other language */}
+          <div className="news-card-back" style={{ direction: isArabic ? 'ltr' : 'rtl' }}>
+            <p className="translated-title">{flipTitle}</p>
+            <p className="translated-summary">{truncate(flipSummary, 200)}</p>
           </div>
         </div>
       </div>
     );
   }
 
-  // ── VERTICAL layout (default) ──────────────────────────────────────
+  // ── VERTICAL layout ────────────────────────────────────────────────────────
   return (
     <div
       ref={cardRef}
       className={cardClass}
-      style={{ animationDelay: staggerDelay(index, 100), cursor: 'pointer' }}
+      style={{ animationDelay: staggerDelay(index, 100), cursor: 'pointer', direction: isArabic ? 'rtl' : 'ltr' }}
       onClick={handleCardClick}
     >
       <div className={`news-card-flip${isFlipped ? ' flipped' : ''}`}>
@@ -185,19 +164,10 @@ export default function NewsCard({ article, index = 0, language = 'en', size = '
             <p className="news-card-summary">{truncate(summary, isWide ? 220 : 140)}</p>
           </div>
         </div>
-
-        {/* BACK — translated */}
-        <div className="news-card-back">
-          {translating ? (
-            <div className="translation-spinner">
-              {language === 'ar' ? 'جارٍ الترجمة...' : 'Translating...'}
-            </div>
-          ) : translated ? (
-            <>
-              <p className="translated-title">{translated.title}</p>
-              <p className="translated-summary">{translated.summary}</p>
-            </>
-          ) : null}
+        {/* BACK — other language */}
+        <div className="news-card-back" style={{ direction: isArabic ? 'ltr' : 'rtl' }}>
+          <p className="translated-title">{flipTitle}</p>
+          <p className="translated-summary">{truncate(flipSummary, 220)}</p>
         </div>
       </div>
     </div>

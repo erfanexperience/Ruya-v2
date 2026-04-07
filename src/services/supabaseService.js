@@ -13,13 +13,12 @@ export const supabase = createClient(
 export async function fetchArticlesFromDB() {
   const { data, error } = await supabase
     .from('articles')
-    .select('url, title, description, image, published_at, source, source_priority, tag, summary')
+    .select('url, title, description, image, published_at, source, source_priority, tag, summary, title_ar, summary_ar')
     .order('published_at', { ascending: false })
     .limit(400)
 
   if (error) throw new Error(error.message)
 
-  // Normalize to the shape the rest of the app expects
   return (data || []).map(a => ({
     id:          a.url,
     url:         a.url,
@@ -31,6 +30,8 @@ export async function fetchArticlesFromDB() {
     sourcePriority: a.source_priority || '',
     tag:         a.tag || null,
     summary:     a.summary || a.description || '',
+    title_ar:    a.title_ar || null,
+    summary_ar:  a.summary_ar || null,
   }))
 }
 

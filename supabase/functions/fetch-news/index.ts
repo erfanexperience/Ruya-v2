@@ -338,22 +338,46 @@ function deduplicateArticles(articles: Article[]): Article[] {
   return result
 }
 
-// ─── Gemini tagging (max 15 per run to stay within timeout) ──────────────────
+// ─── Gemini helpers ───────────────────────────────────────────────────────────
 
 const VALID_TAGS = ['Vision 2030','AI & Robotics','NEOM & Giga Projects','Startups','Cybersecurity','Telecom & 5G','Gaming & Entertainment','General']
 const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent'
 
-async function geminiTag(title: string, key: string): Promise<string> {
-  const prompt = `Classify this news article into exactly ONE category from this list:\nVision 2030, AI & Robotics, NEOM & Giga Projects, Startups, Cybersecurity, Telecom & 5G, Gaming & Entertainment, General\nTitle: ${title}\nReply with only the category name. Nothing else.`
+async function callGemini(prompt: string, key: string, maxTokens = 64): Promise<string> {
   const res = await fetch(`${GEMINI_URL}?key=${key}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { temperature: 0.1, maxOutputTokens: 32 } }),
+    body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { temperature: 0.2, maxOutputTokens: maxTokens } }),
   })
-  if (!res.ok) throw new Error(`Gemini ${res.status}`)
+  if (!res.ok) throw new Error(`Gemini ${res.status}: ${await res.text()}`)
   const data = await res.json()
-  const raw = data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || ''
+  return data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || ''
+}
+
+async function geminiTag(title: string, key: string): Promise<string> {
+  const raw = await callGemini(
+    `Classify this news article into exactly ONE category from this list:\nVision 2030, AI & Robotics, NEOM & Giga Projects, Startups, Cybersecurity, Telecom & 5G, Gaming & Entertainment, General\nTitle: ${title}\nReply with only the category name. Nothing else.`,
+    key, 32
+  )
   return VALID_TAGS.find(t => raw.includes(t)) || 'General'
+}
+
+async function geminiTranslateToArabic(title: string, summary: string, key: string): Promise<{ title_ar: string; summary_ar: string } | null> {
+  const raw = await callGemini(
+    `Translate the following news article title and summary to Arabic naturally and accurately.
+Return JSON only with this exact format: {"title_ar":"...","summary_ar":"..."}
+Title: ${title}
+Summary: ${summary}`,
+    key, 300
+  )
+  try {
+    const cleaned = raw.replace(/```json|```/g, '').trim()
+    const parsed = JSON.parse(cleaned)
+    if (parsed.title_ar && parsed.summary_ar) return parsed
+    return null
+  } catch {
+    return null
+  }
 }
 
 // ─── Main handler ─────────────────────────────────────────────────────────────
@@ -481,7 +505,39 @@ Deno.serve(async (req) => {
       }
     }
 
-    // ── 6. Log the run ────────────────────────────────────────────────────────
+    // ── 6. Arabic translation — articles missing title_ar (up to 30 per run) ──
+    if (GEMINI_KEY) {
+      const { data: untranslated } = await supabase
+        .from('articles')
+        .select('url, title, summary')
+        .is('title_ar', null)
+        .not('title', 'is', null)
+        .limit(30)
+
+      if (untranslated && untranslated.length > 0) {
+        console.log(`[fetch-news] Translating ${untranslated.length} articles to Arabic...`)
+        for (const article of untranslated) {
+          try {
+            const result = await geminiTranslateToArabic(
+              article.title,
+              article.summary || article.title,
+              GEMINI_KEY
+            )
+            if (result) {
+              await supabase.from('articles')
+                .update({ title_ar: result.title_ar, summary_ar: result.summary_ar })
+                .eq('url', article.url)
+            }
+          } catch (e: any) {
+            console.warn('[fetch-news] Translation failed:', e.message)
+          }
+          await new Promise(r => setTimeout(r, 1500)) // respect Gemini rate limit
+        }
+        console.log('[fetch-news] Arabic translation done.')
+      }
+    }
+
+    // ── 7. Log the run ────────────────────────────────────────────────────────
     await supabase.from('fetch_log').insert(logEntry)
 
     return new Response(JSON.stringify({
