@@ -92,9 +92,9 @@ export default function AdminPage() {
       <div className="admin-shell">
         <div className="admin-login">
           <div className="admin-logo">
-            <img src="/Assets/Logo.webp" alt="Ru'ya" style={{ maxHeight: 40, marginBottom: 12 }} onError={e => { e.target.style.display = 'none'; }} />
+            <img src="/Assets/Logo.webp" alt="Taitan Pulse" style={{ maxHeight: 40, marginBottom: 12 }} onError={e => { e.target.style.display = 'none'; }} />
             <h1>Admin Panel</h1>
-            <p>Ru'ya | رؤية — Taitan Pulse</p>
+            <p>Taitan Pulse</p>
           </div>
           <form onSubmit={handleLogin} className="admin-login-form">
             <input
@@ -110,7 +110,7 @@ export default function AdminPage() {
             </button>
             {pwError && <p className="admin-error">Incorrect password</p>}
           </form>
-          <a href="/" className="admin-back">← Back to Ru'ya</a>
+          <a href="/" className="admin-back">← Back to Taitan Pulse</a>
         </div>
       </div>
     );
@@ -125,7 +125,7 @@ export default function AdminPage() {
         <div className="admin-header">
           <div>
             <h1 className="admin-title">Admin Panel</h1>
-            <p className="admin-subtitle">Ru'ya | رؤية — Supabase Content Management</p>
+            <p className="admin-subtitle">Taitan Pulse — Supabase Content Management</p>
           </div>
           <a href="/" className="admin-btn admin-btn--ghost">← Back to App</a>
         </div>
