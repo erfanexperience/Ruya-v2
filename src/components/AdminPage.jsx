@@ -1,72 +1,65 @@
 // AdminPage.jsx
-// Admin control panel — password protected, accessible at /admin
+// Admin control panel at /admin — password protected.
+// Triggers the Supabase edge function for a forced content refresh.
 
 import { useState, useEffect } from 'react';
-import {
-  getCachedArticles,
-  setCachedArticles,
-  clearAllCache,
-  getLastFetchTime,
-  isCacheValid,
-  isAICacheValid,
-  isTranslationCacheValid,
-  markFetched,
-  markAIRun,
-  markTranslationRun,
-  deduplicateArticles,
-} from '../services/cacheService.js';
-import { fetchAllNews } from '../services/newsService.js';
-import { processArticlesBatch, batchTranslateToArabic } from '../services/geminiService.js';
+import { getDBStats, triggerFetchNews } from '../services/supabaseService.js';
 
 const ADMIN_PASSWORD = 'Global$23';
 
 const TAG_LABELS = {
-  'Vision 2030':        'Vision 2030',
-  'AI & Robotics':      'AI & Robotics',
-  'NEOM & Giga Projects': 'Giga Projects',
-  'Startups':           'Startups',
-  'Cybersecurity':      'Cybersecurity',
-  'Telecom & 5G':       'Telecom & 5G',
-  'Gaming & Entertainment': 'Gaming',
-  'General':            'General',
-  null:                 'Untagged',
+  'Vision 2030':           'Vision 2030',
+  'AI & Robotics':         'AI & Robotics',
+  'NEOM & Giga Projects':  'Giga Projects',
+  'Startups':              'Startups',
+  'Cybersecurity':         'Cybersecurity',
+  'Telecom & 5G':          'Telecom & 5G',
+  'Gaming & Entertainment':'Gaming',
+  'General':               'General',
+  'Untagged':              'Untagged',
 };
 
-function timeAgo(ts) {
-  if (!ts) return 'Never';
-  const diff = Date.now() - ts;
+function timeAgo(iso) {
+  if (!iso) return 'Never';
+  const diff = Date.now() - new Date(iso).getTime();
   const h = Math.floor(diff / 3600000);
   const m = Math.floor((diff % 3600000) / 60000);
-  if (h > 0) return `${h}h ${m}m ago`;
+  if (h > 24) return `${Math.floor(h / 24)}d ago`;
+  if (h > 0)  return `${h}h ${m}m ago`;
   return `${m}m ago`;
 }
 
 export default function AdminPage() {
-  const [authed, setAuthed] = useState(false);
-  const [pw, setPw] = useState('');
-  const [pwError, setPwError] = useState(false);
+  const [authed, setAuthed]     = useState(false);
+  const [pw, setPw]             = useState('');
+  const [pwError, setPwError]   = useState(false);
 
-  const [articles, setArticles] = useState([]);
-  const [lastFetch, setLastFetch] = useState(null);
-  const [status, setStatus] = useState('');
-  const [running, setRunning] = useState(false);
+  const [stats, setStats]       = useState(null);
+  const [loading, setLoading]   = useState(false);
+  const [running, setRunning]   = useState(false);
+  const [result, setResult]     = useState(null);  // { success, message } | null
   const [progress, setProgress] = useState('');
 
   function handleLogin(e) {
     e.preventDefault();
     if (pw === ADMIN_PASSWORD) {
       setAuthed(true);
-      loadStats();
     } else {
       setPwError(true);
       setTimeout(() => setPwError(false), 2000);
     }
   }
 
-  function loadStats() {
-    const cached = getCachedArticles() || [];
-    setArticles(cached);
-    setLastFetch(getLastFetchTime());
+  async function loadStats() {
+    setLoading(true);
+    try {
+      const s = await getDBStats();
+      setStats(s);
+    } catch (e) {
+      console.error('[Admin] Failed to load stats:', e);
+    } finally {
+      setLoading(false);
+    }
   }
 
   useEffect(() => {
@@ -75,56 +68,23 @@ export default function AdminPage() {
 
   async function handleForceRefresh() {
     setRunning(true);
-    setStatus('');
+    setResult(null);
+    setProgress('Calling Supabase edge function — fetching all news sources…');
 
     try {
-      setProgress('Clearing cache...');
-      clearAllCache();
-
-      setProgress('Fetching fresh articles from all sources...');
-      const raw = await fetchAllNews();
-      const deduped = deduplicateArticles(raw);
-      setCachedArticles(deduped);
-      markFetched();
-
-      setProgress(`Fetched ${deduped.length} articles. Running Gemini AI (summaries + tags)...`);
-      const needsAI = deduped.filter(a => !a.summary || !a.tag);
-      let finalArticles = deduped;
-      if (needsAI.length > 0) {
-        const processed = await processArticlesBatch(needsAI);
-        finalArticles = deduped.map(a => {
-          const p = processed.find(x => x.url === a.url);
-          return p ? { ...a, summary: p.summary, tag: p.tag } : a;
-        });
-        setCachedArticles(finalArticles);
-        markAIRun();
-      }
-
-      setProgress(`AI processing done. Pre-translating ${finalArticles.length} articles to Arabic...`);
-      await batchTranslateToArabic(finalArticles);
-      markTranslationRun();
-
-      setArticles(finalArticles);
-      setLastFetch(getLastFetchTime());
-      setStatus('success');
-      setProgress('');
+      const res = await triggerFetchNews(ADMIN_PASSWORD);
+      setResult({
+        success: true,
+        message: `Done. ${res.raw} raw → ${res.stored} stored. AI tagged: ${res.ai_tagged}.`,
+      });
+      await loadStats(); // refresh stats after run
     } catch (e) {
-      console.error('[Admin] Force refresh failed:', e);
-      setStatus('error');
-      setProgress('Error: ' + e.message);
+      setResult({ success: false, message: e.message });
     } finally {
       setRunning(false);
+      setProgress('');
     }
   }
-
-  // Category counts
-  const categoryCounts = {};
-  Object.keys(TAG_LABELS).forEach(k => { categoryCounts[k] = 0; });
-  articles.forEach(a => {
-    const key = a.tag || null;
-    if (categoryCounts[key] !== undefined) categoryCounts[key]++;
-    else categoryCounts[key] = 1;
-  });
 
   // ── Login screen ──────────────────────────────────────────────────────────────
   if (!authed) {
@@ -132,9 +92,9 @@ export default function AdminPage() {
       <div className="admin-shell">
         <div className="admin-login">
           <div className="admin-logo">
-            <img src="/Assets/Logo.webp" alt="Ru'ya" style={{ maxHeight: 40, marginBottom: 12 }} />
+            <img src="/Assets/Logo.webp" alt="Ru'ya" style={{ maxHeight: 40, marginBottom: 12 }} onError={e => { e.target.style.display = 'none'; }} />
             <h1>Admin Panel</h1>
-            <p>Ru'ya | رؤية</p>
+            <p>Ru'ya | رؤية — Taitan Pulse</p>
           </div>
           <form onSubmit={handleLogin} className="admin-login-form">
             <input
@@ -156,7 +116,7 @@ export default function AdminPage() {
     );
   }
 
-  // ── Admin dashboard ───────────────────────────────────────────────────────────
+  // ── Dashboard ─────────────────────────────────────────────────────────────────
   return (
     <div className="admin-shell">
       <div className="admin-dashboard">
@@ -165,75 +125,90 @@ export default function AdminPage() {
         <div className="admin-header">
           <div>
             <h1 className="admin-title">Admin Panel</h1>
-            <p className="admin-subtitle">Ru'ya | رؤية — Content Management</p>
+            <p className="admin-subtitle">Ru'ya | رؤية — Supabase Content Management</p>
           </div>
           <a href="/" className="admin-btn admin-btn--ghost">← Back to App</a>
         </div>
 
-        {/* Status cards */}
+        {/* Stats row */}
         <div className="admin-stats-row">
           <div className="admin-stat-card">
-            <span className="admin-stat-label">Total Articles</span>
-            <span className="admin-stat-value">{articles.length}</span>
+            <span className="admin-stat-label">Total Articles (DB)</span>
+            <span className="admin-stat-value">{loading ? '…' : (stats?.total ?? '–')}</span>
           </div>
           <div className="admin-stat-card">
-            <span className="admin-stat-label">Last Fetch</span>
-            <span className="admin-stat-value">{timeAgo(lastFetch)}</span>
+            <span className="admin-stat-label">Last Server Fetch</span>
+            <span className="admin-stat-value" style={{ fontSize: 14 }}>
+              {stats?.recentRuns?.[0] ? timeAgo(stats.recentRuns[0].ran_at) : '–'}
+            </span>
           </div>
-          <div className={`admin-stat-card ${isCacheValid() ? 'admin-stat-card--ok' : 'admin-stat-card--warn'}`}>
-            <span className="admin-stat-label">Article Cache</span>
-            <span className="admin-stat-value">{isCacheValid() ? 'Valid' : 'Expired'}</span>
+          <div className="admin-stat-card admin-stat-card--ok">
+            <span className="admin-stat-label">Data Source</span>
+            <span className="admin-stat-value" style={{ fontSize: 13 }}>Supabase</span>
           </div>
-          <div className={`admin-stat-card ${isAICacheValid() ? 'admin-stat-card--ok' : 'admin-stat-card--warn'}`}>
-            <span className="admin-stat-label">AI Cache</span>
-            <span className="admin-stat-value">{isAICacheValid() ? 'Valid' : 'Expired'}</span>
-          </div>
-          <div className={`admin-stat-card ${isTranslationCacheValid() ? 'admin-stat-card--ok' : 'admin-stat-card--warn'}`}>
-            <span className="admin-stat-label">Translations</span>
-            <span className="admin-stat-value">{isTranslationCacheValid() ? 'Cached' : 'Pending'}</span>
+          <div className="admin-stat-card admin-stat-card--ok">
+            <span className="admin-stat-label">Auto Refresh</span>
+            <span className="admin-stat-value" style={{ fontSize: 13 }}>Daily 07:00 AST</span>
           </div>
         </div>
 
         {/* Category breakdown */}
-        <div className="admin-section">
-          <h2 className="admin-section-title">Articles per Category</h2>
-          <div className="admin-category-grid">
-            {Object.entries(TAG_LABELS).filter(([k]) => k !== null).map(([tag, label]) => {
-              const count = categoryCounts[tag] || 0;
-              const isLow = count < 20;
-              return (
-                <div key={tag} className={`admin-category-card ${isLow ? 'admin-category-card--low' : 'admin-category-card--ok'}`}>
-                  <span className="admin-category-name">{label}</span>
-                  <span className="admin-category-count">{count}</span>
-                  {isLow && <span className="admin-category-warn">Below 20</span>}
-                </div>
-              );
-            })}
+        {stats && (
+          <div className="admin-section">
+            <h2 className="admin-section-title">Articles per Category</h2>
+            <div className="admin-category-grid">
+              {Object.entries(TAG_LABELS).map(([tag, label]) => {
+                const count = stats.byTag[tag] || 0;
+                const isLow = tag !== 'Untagged' && count < 20;
+                return (
+                  <div key={tag} className={`admin-category-card ${isLow ? 'admin-category-card--low' : 'admin-category-card--ok'}`}>
+                    <span className="admin-category-name">{label}</span>
+                    <span className="admin-category-count">{count}</span>
+                    {isLow && <span className="admin-category-warn">Below 20</span>}
+                  </div>
+                );
+              })}
+            </div>
           </div>
-        </div>
+        )}
+
+        {/* Recent runs */}
+        {stats?.recentRuns?.length > 0 && (
+          <div className="admin-section">
+            <h2 className="admin-section-title">Recent Fetch Runs</h2>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {stats.recentRuns.map((run, i) => (
+                <div key={i} className="admin-progress" style={{ background: run.status === 'error' ? 'rgba(255,107,53,0.06)' : undefined }}>
+                  <span style={{ color: run.status === 'error' ? 'var(--accent-orange)' : 'var(--accent-green)', fontSize: 11 }}>
+                    {run.status === 'error' ? '✕' : '✓'}
+                  </span>
+                  <span style={{ fontSize: 12 }}>
+                    {timeAgo(run.ran_at)} — {run.stored} articles stored, {run.ai_tagged} AI tagged
+                    {run.error_msg && ` — Error: ${run.error_msg}`}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Force Refresh */}
         <div className="admin-section">
           <h2 className="admin-section-title">Force Content Refresh</h2>
           <p className="admin-section-desc">
-            Clears all cached data and runs a full pipeline: fetch from all news sources → Gemini AI summaries + tagging → Arabic pre-translation. This uses API quota.
+            Triggers the Supabase edge function immediately — fetches all news sources, deduplicates, stores to DB, and runs Gemini tagging on up to 15 untagged articles. Normally this runs automatically every day at 07:00 Riyadh time. Use this only when you want fresh content before the scheduled run.
           </p>
 
-          {progress && (
+          {running && (
             <div className="admin-progress">
               <div className="admin-progress-spinner" />
-              <span>{progress}</span>
+              <span>{progress || 'Running… this may take 30–90 seconds.'}</span>
             </div>
           )}
 
-          {status === 'success' && !running && (
-            <div className="admin-alert admin-alert--success">
-              Refresh complete — {articles.length} articles fetched, tagged, and translated.
-            </div>
-          )}
-          {status === 'error' && !running && (
-            <div className="admin-alert admin-alert--error">
-              {progress || 'Refresh failed — check console for details.'}
+          {result && !running && (
+            <div className={`admin-alert ${result.success ? 'admin-alert--success' : 'admin-alert--error'}`}>
+              {result.message}
             </div>
           )}
 
@@ -242,7 +217,16 @@ export default function AdminPage() {
             onClick={handleForceRefresh}
             disabled={running}
           >
-            {running ? 'Running...' : 'Force Full Refresh'}
+            {running ? 'Running…' : 'Force Full Refresh'}
+          </button>
+
+          <button
+            className="admin-btn admin-btn--ghost"
+            onClick={loadStats}
+            disabled={loading}
+            style={{ marginTop: 0 }}
+          >
+            {loading ? 'Loading…' : 'Refresh Stats'}
           </button>
         </div>
 
