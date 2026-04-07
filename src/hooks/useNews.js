@@ -3,14 +3,16 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { fetchAllNews } from '../services/newsService.js';
-import { processArticlesBatch } from '../services/geminiService.js';
+import { processArticlesBatch, batchTranslateToArabic } from '../services/geminiService.js';
 import {
   isCacheValid,
   isAICacheValid,
+  isTranslationCacheValid,
   getCachedArticles,
   setCachedArticles,
   markFetched,
   markAIRun,
+  markTranslationRun,
   clearAllCache,
   getLastFetchTime,
   deduplicateArticles,
@@ -27,6 +29,31 @@ const TAG_TO_TOPIC = {
   'Gaming & Entertainment': 'gaming',
   'General': 'all',
 };
+
+// Keyword fallback for articles not yet tagged by Gemini
+const TOPIC_KEYWORDS = {
+  vision2030: ['vision 2030', 'vision2030', 'economic diversification', 'saudi economic reform', 'neom vision', 'saudi 2030', 'national transformation', 'mbs reform'],
+  ai: ['artificial intelligence', 'machine learning', 'deep learning', 'neural network', 'chatgpt', 'openai', 'llm', 'generative ai', 'large language', 'robotics', 'autonomous', 'sdaia', 'ai model', 'ai startup', 'ai strategy'],
+  neom: ['neom', 'giga project', 'giga-project', 'the line', 'red sea project', 'diriyah', 'qiddiya', 'sindalah', 'oxagon', 'trojena'],
+  startups: ['startup', 'start-up', 'venture capital', 'fintech', 'series a', 'series b', 'funding round', 'seed funding', 'edtech', 'healthtech', 'biotech', 'proptech', 'insurtech', 'stv fund', 'wa\'ed', 'sanabil'],
+  cyber: ['cybersecurity', 'cyber security', 'cyberattack', 'cyber attack', 'ransomware', 'malware', 'data breach', 'phishing', 'hacking', 'infosec', 'zero-day', 'vulnerability', 'nca saudi'],
+  telecom: ['5g network', '5g technology', 'telecom', 'stc ', 'mobily', 'broadband', 'fiber optic', 'fiber internet', 'satellite internet', '6g', 'telecommunications'],
+  gaming: ['gaming', 'esports', 'e-sports', 'savvy games', 'video game', 'game developer', 'game studio', 'pif gaming', 'saudi gaming', 'entertainment technology', 'qiddiya gaming'],
+};
+
+function articleMatchesTopic(article, topic) {
+  // First try Gemini tag
+  if (article.tag) {
+    const topicId = TAG_TO_TOPIC[article.tag];
+    if (topicId === topic) return true;
+    if (article.tag === topic) return true;
+  }
+  // Fallback: keyword matching on title + description + summary
+  const keywords = TOPIC_KEYWORDS[topic];
+  if (!keywords) return false;
+  const text = ` ${article.title} ${article.description} ${article.summary || ''} `.toLowerCase();
+  return keywords.some(kw => text.includes(kw));
+}
 
 export function useNews() {
   const [articles, setArticles] = useState([]);
@@ -45,11 +72,9 @@ export function useNews() {
       let articlesData;
 
       if (!forceRefresh && isCacheValid()) {
-        // Use cache
         articlesData = getCachedArticles();
         console.log('[Ruya] Using cached articles');
       } else {
-        // Fresh fetch
         const raw = await fetchAllNews();
         articlesData = deduplicateArticles(raw);
         setCachedArticles(articlesData);
@@ -57,13 +82,15 @@ export function useNews() {
         console.log(`[Ruya] Fresh fetch complete: ${articlesData.length} unique articles`);
       }
 
-      // Run AI processing if needed
+      setArticles(articlesData);
+      setArticleCount(articlesData.length);
+      setLastFetchTime(getLastFetchTime());
+
+      // Run AI processing (summaries + tags) if needed
       if (!isAICacheValid() || forceRefresh) {
-        // Only process articles that don't have summaries/tags yet
         const needsAI = articlesData.filter(a => !a.summary || !a.tag);
         if (needsAI.length > 0) {
           processArticlesBatch(needsAI).then(processed => {
-            // Merge AI results back
             const merged = articlesData.map(a => {
               const p = processed.find(x => x.url === a.url);
               return p ? { ...a, summary: p.summary, tag: p.tag } : a;
@@ -72,17 +99,30 @@ export function useNews() {
             setArticles(merged);
             setArticleCount(merged.length);
             markAIRun();
+
+            // After AI processing, kick off Arabic pre-translation in background
+            if (!isTranslationCacheValid() || forceRefresh) {
+              batchTranslateToArabic(merged).then(() => {
+                markTranslationRun();
+              }).catch(e => {
+                console.warn('[Ruya] Arabic batch translation failed:', e.message);
+              });
+            }
           }).catch(e => {
             console.warn('[Ruya] AI processing failed:', e.message);
           });
         } else {
           markAIRun();
+          // Trigger Arabic pre-translation if not cached
+          if (!isTranslationCacheValid() || forceRefresh) {
+            batchTranslateToArabic(articlesData).then(() => {
+              markTranslationRun();
+            }).catch(e => {
+              console.warn('[Ruya] Arabic batch translation failed:', e.message);
+            });
+          }
         }
       }
-
-      setArticles(articlesData);
-      setArticleCount(articlesData.length);
-      setLastFetchTime(getLastFetchTime());
     } catch (e) {
       console.error('[Ruya] Load failed:', e);
       setError(e.message);
@@ -95,20 +135,6 @@ export function useNews() {
     loadArticles(false);
   }, [loadArticles]);
 
-  // Ctrl+Shift+R force refresh
-  useEffect(() => {
-    const handleKeyDown = (e) => {
-      if (e.ctrlKey && e.shiftKey && e.key === 'R') {
-        e.preventDefault();
-        console.log('[Ruya] Manual cache clear triggered (Ctrl+Shift+R)');
-        clearAllCache();
-        loadArticles(true);
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [loadArticles]);
-
   // Debounced topic switch (300ms)
   const handleTopicChange = useCallback((topic) => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -119,10 +145,12 @@ export function useNews() {
 
   const filteredArticles = activeTopic === 'all'
     ? articles
-    : articles.filter(a => {
-        const topicId = TAG_TO_TOPIC[a.tag] || 'all';
-        return topicId === activeTopic || a.tag === activeTopic;
-      });
+    : articles.filter(a => articleMatchesTopic(a, activeTopic));
+
+  const refresh = useCallback(() => {
+    clearAllCache();
+    loadArticles(true);
+  }, [loadArticles]);
 
   return {
     articles: filteredArticles,
@@ -133,9 +161,6 @@ export function useNews() {
     setActiveTopic: handleTopicChange,
     articleCount,
     lastFetchTime,
-    refresh: () => {
-      clearAllCache();
-      loadArticles(true);
-    },
+    refresh,
   };
 }

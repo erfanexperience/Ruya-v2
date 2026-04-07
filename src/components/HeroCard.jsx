@@ -6,7 +6,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { translateArticle } from '../services/geminiService.js';
 import { timeAgo, getFallbackImage } from '../utils/helpers.js';
 
-export default function HeroCard({ article, language = 'en' }) {
+export default function HeroCard({ article, language = 'en', onSelect }) {
   const [isFlipped, setIsFlipped] = useState(false);
   const [translated, setTranslated] = useState(null);
   const [translating, setTranslating] = useState(false);
@@ -79,7 +79,7 @@ export default function HeroCard({ article, language = 'en' }) {
 
   function handleCardClick(e) {
     if (e.target.closest('button, a')) return;
-    window.open(url, '_blank', 'noopener,noreferrer');
+    if (onSelect) onSelect(article);
   }
 
   const handleTranslate = useCallback(async (e) => {

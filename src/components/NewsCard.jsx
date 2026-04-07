@@ -3,18 +3,19 @@
 // layout="vertical"   → default stacked layout
 
 import { useState, useRef, useEffect, useCallback } from 'react';
+// imgRef removed — lazy loading now uses native loading="lazy" attribute
 import { translateArticle } from '../services/geminiService.js';
 import { timeAgo, truncate, getFallbackImage, staggerDelay } from '../utils/helpers.js';
 
-export default function NewsCard({ article, index = 0, language = 'en', size = 'normal', layout = 'vertical' }) {
+export default function NewsCard({ article, index = 0, language = 'en', size = 'normal', layout = 'vertical', onSelect }) {
   const [isFlipped, setIsFlipped] = useState(false);
   const [translated, setTranslated] = useState(null);
   const [translating, setTranslating] = useState(false);
   const [imgLoaded, setImgLoaded] = useState(false);
+  const [imgError, setImgError] = useState(false);
   const hasFlickered = true; // always apply flicker class; CSS fires it on card--visible
 
   const cardRef = useRef(null);
-  const imgRef = useRef(null);
   const magnetRef = useRef({ x: 0, y: 0, rafId: null });
 
   const title = article.title || '';
@@ -31,19 +32,6 @@ export default function NewsCard({ article, index = 0, language = 'en', size = '
 
   // flicker class is applied immediately; card--visible is added by NewsViewport's IntersectionObserver
   // which triggers holoFlicker via .card.flicker.card--visible CSS rule
-
-  useEffect(() => {
-    const img = imgRef.current;
-    if (!img) return;
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) { img.src = image; observer.disconnect(); }
-      },
-      { rootMargin: '200px' }
-    );
-    observer.observe(img);
-    return () => observer.disconnect();
-  }, [image]);
 
   useEffect(() => {
     const card = cardRef.current;
@@ -102,9 +90,8 @@ export default function NewsCard({ article, index = 0, language = 'en', size = '
   ].filter(Boolean).join(' ');
 
   function handleCardClick(e) {
-    // Don't navigate if user clicked a button or a link inside
     if (e.target.closest('button, a')) return;
-    window.open(url, '_blank', 'noopener,noreferrer');
+    if (onSelect) onSelect(article);
   }
 
   // ── HORIZONTAL layout (30/70) ──────────────────────────────────────
@@ -120,15 +107,18 @@ export default function NewsCard({ article, index = 0, language = 'en', size = '
           {/* FRONT */}
           <div className="news-card-front news-card-front--h">
             {/* Image — 30% */}
-            <div className="news-card-img-h">
-              <img
-                ref={imgRef}
-                className={`news-card-image${imgLoaded ? ' loaded' : ''}`}
-                alt={title}
-                onLoad={() => setImgLoaded(true)}
-                onError={(e) => { e.target.src = getFallbackImage(title + index); setImgLoaded(true); }}
-              />
-            </div>
+            {!imgError && (
+              <div className="news-card-img-h">
+                <img
+                  src={image}
+                  loading="lazy"
+                  className={`news-card-image${imgLoaded ? ' loaded' : ''}`}
+                  alt={title}
+                  onLoad={() => setImgLoaded(true)}
+                  onError={() => setImgError(true)}
+                />
+              </div>
+            )}
             {/* Content — 70% */}
             <div className="news-card-content-h">
               <div className="news-card-body">
@@ -172,16 +162,19 @@ export default function NewsCard({ article, index = 0, language = 'en', size = '
       <div className={`news-card-flip${isFlipped ? ' flipped' : ''}`}>
         {/* FRONT */}
         <div className="news-card-front">
-          <div className="news-card-image-wrap">
-            <img
-              ref={imgRef}
-              className={`news-card-image${imgLoaded ? ' loaded' : ''}`}
-              alt={title}
-              onLoad={() => setImgLoaded(true)}
-              onError={(e) => { e.target.src = getFallbackImage(title + index); setImgLoaded(true); }}
-            />
-            <div className="news-card-image-overlay" />
-          </div>
+          {!imgError && (
+            <div className="news-card-image-wrap">
+              <img
+                src={image}
+                loading="lazy"
+                className={`news-card-image${imgLoaded ? ' loaded' : ''}`}
+                alt={title}
+                onLoad={() => setImgLoaded(true)}
+                onError={() => setImgError(true)}
+              />
+              <div className="news-card-image-overlay" />
+            </div>
+          )}
           <div className="news-card-body">
             <div className="news-card-meta">
               <span className="news-card-source">{source}</span>

@@ -44,6 +44,10 @@ export default function HeroSection({ language }) {
           )}
         </h1>
 
+        <div className="hero-scroll-hint">
+          <span>{isArabic ? 'اسحب للأسفل' : 'Scroll for news'}</span>
+          <div className="hero-scroll-arrow" />
+        </div>
       </div>
 
       {/* RIGHT — 3D robot */}

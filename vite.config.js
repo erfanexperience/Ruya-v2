@@ -4,8 +4,14 @@ import react from '@vitejs/plugin-react'
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react()],
-  base: './',   // relative base so GitHub Pages assets resolve correctly
+  base: '/',
   build: {
-    chunkSizeWarningLimit: 2200, // spline runtime + three.js are large by nature
+    chunkSizeWarningLimit: 2200,
+  },
+  server: {
+    historyApiFallback: true,
+  },
+  preview: {
+    historyApiFallback: true,
   },
 })

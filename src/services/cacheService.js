@@ -8,16 +8,17 @@ const CACHE_KEYS = {
   TAGS: 'ruya_tags',
   LAST_FETCH: 'ruya_last_fetch',
   LAST_AI_RUN: 'ruya_last_ai_run',
+  LAST_TRANSLATION_RUN: 'ruya_last_translation_run',
 };
 
 const TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
 
 // ─── Source priority for dedup tiebreaking (index = priority, lower = higher priority) ───
 const SOURCE_PRIORITY = [
-  'Saudi Press Agency',
   'Arab News',
-  'Saudi Gazette',
-  'Al Arabiya',
+  'TechCrunch',
+  'MIT Tech Review',
+  'The Verge',
   'NewsAPI',
   'GNews',
   'TheNewsAPI',
@@ -70,6 +71,16 @@ export function markFetched() {
 
 export function markAIRun() {
   setCached(CACHE_KEYS.LAST_AI_RUN, Date.now());
+}
+
+export function isTranslationCacheValid() {
+  const last = getCached(CACHE_KEYS.LAST_TRANSLATION_RUN);
+  if (!last) return false;
+  return Date.now() - last < TTL_MS;
+}
+
+export function markTranslationRun() {
+  setCached(CACHE_KEYS.LAST_TRANSLATION_RUN, Date.now());
 }
 
 export function clearAllCache() {

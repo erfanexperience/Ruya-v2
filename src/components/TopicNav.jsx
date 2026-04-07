@@ -7,7 +7,7 @@ const TOPICS = [
   { id: 'all',        en: 'All',                  ar: 'الكل' },
   { id: 'vision2030', en: 'Vision 2030',           ar: 'رؤية 2030' },
   { id: 'ai',         en: 'AI & Robotics',         ar: 'الذكاء الاصطناعي' },
-  { id: 'neom',       en: 'NEOM & Giga Projects',  ar: 'نيوم' },
+  { id: 'neom',       en: 'Giga Projects',          ar: 'مشاريع جيجا' },
   { id: 'startups',   en: 'Startups',              ar: 'الشركات الناشئة' },
   { id: 'cyber',      en: 'Cybersecurity',         ar: 'الأمن السيبراني' },
   { id: 'telecom',    en: 'Telecom & 5G',          ar: 'الاتصالات' },

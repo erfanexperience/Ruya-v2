@@ -83,7 +83,6 @@ Summary: ${article.summary || article.description}`;
   const raw = await callGemini(prompt);
   let parsed = null;
   try {
-    // Strip possible markdown code fences
     const cleaned = raw.replace(/```json|```/g, '').trim();
     parsed = JSON.parse(cleaned);
   } catch {
@@ -124,7 +123,7 @@ Reply with only the category name. Nothing else.`;
   return tag;
 }
 
-// ─── Batch process all articles ───────────────────────────────────────────────
+// ─── Batch process all articles (summaries + tags) ────────────────────────────
 
 export async function processArticlesBatch(articles) {
   console.log(`[Ruya] Starting Gemini batch processing for ${articles.length} articles (max ${MAX_CONCURRENT} concurrent)`);
@@ -140,8 +139,9 @@ export async function processArticlesBatch(articles) {
     }
   });
 
-  // Tags
+  // Tags (only for articles not pre-tagged at fetch time)
   await runInBatches(articles, async (article) => {
+    if (article.tag) return; // already pre-tagged
     try {
       const tag = await tagArticle(article);
       article.tag = tag;
@@ -153,4 +153,31 @@ export async function processArticlesBatch(articles) {
 
   console.log('[Ruya] Gemini batch processing complete');
   return articles;
+}
+
+// ─── Batch pre-translate all articles to Arabic (background job) ──────────────
+
+export async function batchTranslateToArabic(articles) {
+  const needsTranslation = articles.filter(a => {
+    // Skip if already cached
+    return !getCachedTranslation(a.url, 'Arabic');
+  });
+
+  if (needsTranslation.length === 0) {
+    console.log('[Ruya] Arabic translations: all cached, skipping batch.');
+    return;
+  }
+
+  console.log(`[Ruya] Pre-translating ${needsTranslation.length} articles to Arabic...`);
+
+  await runInBatches(needsTranslation, async (article) => {
+    try {
+      await translateArticle(article, 'Arabic');
+    } catch (e) {
+      // Silent fail — on-demand translation will retry when user clicks
+      console.warn(`[Ruya] Arabic pre-translation failed for "${article.title}":`, e.message);
+    }
+  });
+
+  console.log('[Ruya] Arabic pre-translation complete.');
 }

@@ -6,8 +6,8 @@ import './styles.css';
 import ParticleBackground from './components/ParticleBackground.jsx';
 import Header from './components/Header.jsx';
 import TopicNav from './components/TopicNav.jsx';
-import HeroSection from './components/HeroSection.jsx';
 import NewsViewport from './components/NewsViewport.jsx';
+import ArticleModal from './components/ArticleModal.jsx';
 import LoadingScreen from './components/LoadingScreen.jsx';
 import { useNews } from './hooks/useNews.js';
 import { useLanguage } from './hooks/useLanguage.js';
@@ -15,6 +15,7 @@ import { useLanguage } from './hooks/useLanguage.js';
 export default function App() {
   const { language, toggleLanguage } = useLanguage();
   const [showApp, setShowApp] = useState(false);
+  const [selectedArticle, setSelectedArticle] = useState(null);
 
   const {
     articles,
@@ -54,12 +55,7 @@ export default function App() {
           language={language}
         />
 
-        {/* Hero — only on "all" tab */}
-        {activeTopic === 'all' && (
-          <HeroSection language={language} />
-        )}
-
-        {/* Vertical news feed */}
+        {/* Vertical news feed (hero lives inside viewport when activeTopic=all) */}
         {error ? (
           <div className="empty-state" style={{ minHeight: '40vh', color: 'var(--accent-orange)' }}>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
@@ -76,9 +72,19 @@ export default function App() {
             articles={articles}
             loading={loading}
             language={language}
+            activeTopic={activeTopic}
+            onArticleSelect={setSelectedArticle}
           />
         )}
       </div>
+
+      {selectedArticle && (
+        <ArticleModal
+          article={selectedArticle}
+          language={language}
+          onClose={() => setSelectedArticle(null)}
+        />
+      )}
     </>
   );
 }
