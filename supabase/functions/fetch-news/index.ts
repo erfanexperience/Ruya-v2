@@ -362,23 +362,6 @@ async function geminiTag(title: string, key: string): Promise<string> {
   return VALID_TAGS.find(t => raw.includes(t)) || 'General'
 }
 
-async function geminiTranslateToArabic(title: string, summary: string, key: string): Promise<{ title_ar: string; summary_ar: string } | null> {
-  const raw = await callGemini(
-    `Translate the following news article title and summary to Arabic naturally and accurately.
-Return JSON only with this exact format: {"title_ar":"...","summary_ar":"..."}
-Title: ${title}
-Summary: ${summary}`,
-    key, 300
-  )
-  try {
-    const cleaned = raw.replace(/```json|```/g, '').trim()
-    const parsed = JSON.parse(cleaned)
-    if (parsed.title_ar && parsed.summary_ar) return parsed
-    return null
-  } catch {
-    return null
-  }
-}
 
 // ─── Main handler ─────────────────────────────────────────────────────────────
 
@@ -505,39 +488,7 @@ Deno.serve(async (req) => {
       }
     }
 
-    // ── 6. Arabic translation — articles missing title_ar (up to 30 per run) ──
-    if (GEMINI_KEY) {
-      const { data: untranslated } = await supabase
-        .from('articles')
-        .select('url, title, summary')
-        .is('title_ar', null)
-        .not('title', 'is', null)
-        .limit(30)
-
-      if (untranslated && untranslated.length > 0) {
-        console.log(`[fetch-news] Translating ${untranslated.length} articles to Arabic...`)
-        for (const article of untranslated) {
-          try {
-            const result = await geminiTranslateToArabic(
-              article.title,
-              article.summary || article.title,
-              GEMINI_KEY
-            )
-            if (result) {
-              await supabase.from('articles')
-                .update({ title_ar: result.title_ar, summary_ar: result.summary_ar })
-                .eq('url', article.url)
-            }
-          } catch (e: any) {
-            console.warn('[fetch-news] Translation failed:', e.message)
-          }
-          await new Promise(r => setTimeout(r, 1500)) // respect Gemini rate limit
-        }
-        console.log('[fetch-news] Arabic translation done.')
-      }
-    }
-
-    // ── 7. Log the run ────────────────────────────────────────────────────────
+    // ── 6. Log the run ────────────────────────────────────────────────────────
     await supabase.from('fetch_log').insert(logEntry)
 
     return new Response(JSON.stringify({

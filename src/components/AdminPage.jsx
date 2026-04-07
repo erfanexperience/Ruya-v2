@@ -3,7 +3,7 @@
 // Triggers the Supabase edge function for a forced content refresh.
 
 import { useState, useEffect } from 'react';
-import { getDBStats, triggerFetchNews } from '../services/supabaseService.js';
+import { getDBStats, triggerFetchNews, triggerTranslateArticles } from '../services/supabaseService.js';
 
 const ADMIN_PASSWORD = 'Taitan12@@4';
 
@@ -36,9 +36,11 @@ export default function AdminPage() {
 
   const [stats, setStats]       = useState(null);
   const [loading, setLoading]   = useState(false);
-  const [running, setRunning]   = useState(false);
-  const [result, setResult]     = useState(null);  // { success, message } | null
-  const [progress, setProgress] = useState('');
+  const [running, setRunning]         = useState(false);
+  const [translating, setTranslating] = useState(false);
+  const [result, setResult]           = useState(null);
+  const [translateResult, setTranslateResult] = useState(null);
+  const [progress, setProgress]       = useState('');
 
   function handleLogin(e) {
     e.preventDefault();
@@ -227,6 +229,50 @@ export default function AdminPage() {
             style={{ marginTop: 0 }}
           >
             {loading ? 'Loading…' : 'Refresh Stats'}
+          </button>
+        </div>
+
+        {/* Arabic Translation */}
+        <div className="admin-section">
+          <h2 className="admin-section-title">Arabic Translation</h2>
+          <p className="admin-section-desc">
+            Translates up to 40 untranslated articles to Arabic via Gemini and stores the result permanently in the database. Run this multiple times until all articles are translated. Each article is only ever translated once.
+          </p>
+
+          {translating && (
+            <div className="admin-progress">
+              <div className="admin-progress-spinner" />
+              <span>Translating up to 40 articles… takes ~60 seconds.</span>
+            </div>
+          )}
+
+          {translateResult && !translating && (
+            <div className={`admin-alert ${translateResult.success ? 'admin-alert--success' : 'admin-alert--error'}`}>
+              {translateResult.message}
+            </div>
+          )}
+
+          <button
+            className="admin-btn admin-btn--primary"
+            onClick={async () => {
+              setTranslating(true);
+              setTranslateResult(null);
+              try {
+                const res = await triggerTranslateArticles(ADMIN_PASSWORD);
+                setTranslateResult({
+                  success: true,
+                  message: res.message || `Translated ${res.translated} articles. Failed: ${res.failed}.`,
+                });
+                await loadStats();
+              } catch (e) {
+                setTranslateResult({ success: false, message: e.message });
+              } finally {
+                setTranslating(false);
+              }
+            }}
+            disabled={translating || running}
+          >
+            {translating ? 'Translating…' : 'Translate to Arabic (40 articles)'}
           </button>
         </div>
 

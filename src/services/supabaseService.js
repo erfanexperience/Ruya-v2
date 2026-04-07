@@ -41,10 +41,21 @@ export async function triggerFetchNews(adminPassword) {
   const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/fetch-news`
   const res = await fetch(url, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-admin-key':  adminPassword,
-    },
+    headers: { 'Content-Type': 'application/json', 'x-admin-key': adminPassword },
+    body: JSON.stringify({}),
+  })
+  const data = await res.json()
+  if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`)
+  return data
+}
+
+// ─── Admin: trigger Arabic translation ───────────────────────────────────────
+
+export async function triggerTranslateArticles(adminPassword) {
+  const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/translate-articles`
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-admin-key': adminPassword },
     body: JSON.stringify({}),
   })
   const data = await res.json()
