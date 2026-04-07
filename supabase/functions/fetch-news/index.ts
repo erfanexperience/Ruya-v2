@@ -216,41 +216,60 @@ async function fetchWorldNews(key: string): Promise<Article[]> {
 // ─── Filter ───────────────────────────────────────────────────────────────────
 
 const BLOCKLIST = [
-  'cricket', 'ipl ', ' ipl', 'soccer match', 'rugby', 'tennis match',
-  'golf tournament', 'basketball', 'baseball', 'nba ', 'nfl ', 'premier league',
-  'batting', 'bowling', 'wicket', 'scored a century',
-  'election', 'polling booth', 'lok sabha', 'rajya sabha', 'india poll', 'modi ', 'bjp ',
-  'bollywood', 'film release', 'box office',
-  'recipe', 'travel tips', 'hotel review', 'horoscope', 'astrology',
+  'cricket', 'ipl ', ' ipl', 'soccer match', 'rugby match', 'tennis match',
+  'golf tournament', 'nba ', 'nfl ', 'premier league',
+  'batting', 'bowling', 'wicket',
+  'lok sabha', 'rajya sabha', 'india poll', 'bjp ',
+  'bollywood', 'box office collection',
+  'horoscope', 'astrology',
 ]
 
 const TECH_KEYWORDS = [
+  // AI
   'artificial intelligence', 'machine learning', 'deep learning', 'neural network',
-  'chatgpt', 'openai', 'gemini', 'llm', 'generative ai',
-  'robotics', 'autonomous', 'cybersecurity', 'cyberattack', 'ransomware', 'data breach',
-  'semiconductor', '5g network', 'broadband fiber', 'telecom infrastructure',
+  'chatgpt', 'openai', 'gemini', 'llm', 'generative ai', 'ai model',
+  // Robotics / autonomous
+  'robotics', 'autonomous vehicle', 'self-driving', 'drone',
+  // Security
+  'cybersecurity', 'cyber security', 'cyberattack', 'ransomware', 'data breach', 'hacking',
+  // Hardware
+  'semiconductor', 'microchip', 'gpu', 'processor chip',
+  // Connectivity
+  '5g', '6g', 'broadband', 'fiber optic', 'telecom', 'satellite internet',
+  // Tech business
   'blockchain', 'quantum computing', 'cloud computing', 'data center',
-  'tech startup', 'venture capital', 'fintech', 'edtech', 'healthtech',
+  'startup', 'venture capital', 'fintech', 'edtech', 'healthtech',
+  'tech company', 'technology company', 'software', 'digital platform', 'mobile app',
+  // Saudi-specific tech
   'neom', 'vision 2030', 'sdaia', 'smart city', 'giga project', 'digital transformation',
-  'electric vehicle', 'drone technology', 'augmented reality', 'virtual reality',
-  'esports', 'gaming technology', 'savvy games', 'qiddiya',
+  'savvy games', 'qiddiya', 'sindalah', 'the line',
+  // Entertainment tech
+  'esports', 'gaming', 'metaverse', 'virtual reality', 'augmented reality',
+  // Innovation
+  'innovation', 'technology', 'digital economy', 'tech hub',
 ]
 
 const SAUDI_KEYWORDS = [
   'saudi', 'riyadh', 'jeddah', 'ksa', 'neom', 'vision 2030', 'aramco',
-  'stc', 'mobily', 'sdaia', 'gulf', 'middle east', 'mena',
-  'uae', 'dubai', 'qatar', 'savvy games', 'pif',
+  'stc', 'mobily', 'sdaia', 'gulf', 'middle east', 'mena', 'arab',
+  'uae', 'dubai', 'abu dhabi', 'qatar', 'kuwait', 'bahrain', 'oman',
+  'savvy games', 'pif', 'saudi fund',
 ]
 
 const PURE_TECH_SOURCES = ['TechCrunch', 'The Verge', 'MIT Tech Review']
 
 function passesFilter(a: Article): boolean {
+  if (!a.title || a.title.length < 10) return false
+  // Skip [Removed] articles (NewsAPI free tier)
+  if (a.title.includes('[Removed]') || a.description?.includes('[Removed]')) return false
   const text = ` ${a.title} ${a.description} `.toLowerCase()
   if (BLOCKLIST.some(kw => text.includes(kw))) return false
+  // Pre-tagged articles: just need one relevance signal
   if (a.tag) return TECH_KEYWORDS.some(kw => text.includes(kw)) || SAUDI_KEYWORDS.some(kw => text.includes(kw))
-  if (!TECH_KEYWORDS.some(kw => text.includes(kw))) return false
-  if (!PURE_TECH_SOURCES.includes(a.source) && !SAUDI_KEYWORDS.some(kw => text.includes(kw))) return false
-  return true
+  // Pure tech sources: only need tech keyword
+  if (PURE_TECH_SOURCES.includes(a.source)) return TECH_KEYWORDS.some(kw => text.includes(kw))
+  // Others: need BOTH tech AND Saudi
+  return TECH_KEYWORDS.some(kw => text.includes(kw)) && SAUDI_KEYWORDS.some(kw => text.includes(kw))
 }
 
 // ─── Deduplication ────────────────────────────────────────────────────────────
@@ -344,7 +363,7 @@ Deno.serve(async (req) => {
 
   // Auth: must include admin password
   const adminKey    = req.headers.get('x-admin-key')
-  const ADMIN_PASS  = Deno.env.get('ADMIN_PASSWORD') || 'Global$23'
+  const ADMIN_PASS  = Deno.env.get('ADMIN_PASSWORD') || 'Taitan12@@4'
   if (adminKey !== ADMIN_PASS) {
     return new Response(JSON.stringify({ error: 'Unauthorized' }), {
       status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -415,13 +434,13 @@ Deno.serve(async (req) => {
     }
     logEntry.stored = upserted
 
-    // ── 5. Gemini tagging for articles with no tag (max 15 per run) ───────────
+    // ── 5. Gemini tagging for articles with no tag (up to 40 per run) ──────────
     if (GEMINI_KEY) {
       const { data: untagged } = await supabase
         .from('articles')
         .select('url, title')
         .is('tag', null)
-        .limit(15)
+        .limit(40)
 
       if (untagged && untagged.length > 0) {
         console.log(`[fetch-news] Gemini tagging ${untagged.length} articles...`)
@@ -439,7 +458,7 @@ Deno.serve(async (req) => {
     }
 
     // ── 6. Log the run ────────────────────────────────────────────────────────
-    await supabase.from('fetch_log').insert({ ...logEntry, completed_at: new Date().toISOString() })
+    await supabase.from('fetch_log').insert(logEntry)
 
     return new Response(JSON.stringify({
       success:    true,

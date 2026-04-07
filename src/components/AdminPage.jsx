@@ -5,7 +5,7 @@
 import { useState, useEffect } from 'react';
 import { getDBStats, triggerFetchNews } from '../services/supabaseService.js';
 
-const ADMIN_PASSWORD = 'Global$23';
+const ADMIN_PASSWORD = 'Taitan12@@4';
 
 const TAG_LABELS = {
   'Vision 2030':           'Vision 2030',

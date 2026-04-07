@@ -67,7 +67,7 @@ select cron.schedule(
     url     := 'https://esacgqoalnvyzpsgrruc.supabase.co/functions/v1/fetch-news',
     headers := jsonb_build_object(
       'Content-Type', 'application/json',
-      'x-admin-key',  'Global$23'
+      'x-admin-key',  'Taitan12@@4'
     ),
     body    := '{}'::jsonb
   );

@@ -71,11 +71,13 @@ export function useNews() {
           const cachedRaw  = localStorage.getItem(CACHE_KEY);
           if (cachedTime && cachedRaw && Date.now() - parseInt(cachedTime) < CACHE_TTL) {
             const cached = JSON.parse(cachedRaw);
-            setArticles(cached);
-            setArticleCount(cached.length);
-            setLastFetchTime(parseInt(cachedTime));
-            setLoading(false);
-            return;
+            if (cached.length > 0) {
+              setArticles(cached);
+              setArticleCount(cached.length);
+              setLastFetchTime(parseInt(cachedTime));
+              setLoading(false);
+              return;
+            }
           }
         } catch { /* ignore parse errors, fetch fresh */ }
       }
