@@ -406,8 +406,32 @@ Deno.serve(async (req) => {
     logEntry.raw_count = allRaw.length
     console.log(`[fetch-news] ${allRaw.length} raw → ${filtered.length} filtered → ${deduped.length} unique`)
 
-    // ── 3. Remove articles older than 7 days ─────────────────────────────────
-    const cutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
+    // ── 3. Cleanup: keep DB within free tier cap (5,000 articles max) ────────
+    const ARTICLE_CAP = 5000
+    const { count: currentCount } = await supabase
+      .from('articles')
+      .select('*', { count: 'exact', head: true })
+
+    if (currentCount && currentCount > ARTICLE_CAP) {
+      // Find the cutoff date for the oldest articles beyond the cap
+      const { data: cutoffRow } = await supabase
+        .from('articles')
+        .select('fetched_at')
+        .order('fetched_at', { ascending: true })
+        .range(ARTICLE_CAP - 1, ARTICLE_CAP)
+        .limit(1)
+
+      if (cutoffRow?.[0]?.fetched_at) {
+        const { count: deleted } = await supabase
+          .from('articles')
+          .delete({ count: 'exact' })
+          .lt('fetched_at', cutoffRow[0].fetched_at)
+        console.log(`[fetch-news] Cleanup: removed ${deleted} old articles to stay under ${ARTICLE_CAP} cap`)
+      }
+    }
+
+    // Also remove articles older than 30 days regardless of count
+    const cutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
     await supabase.from('articles').delete().lt('published_at', cutoff)
 
     // ── 4. Upsert in batches of 50 ────────────────────────────────────────────
