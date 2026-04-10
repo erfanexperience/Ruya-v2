@@ -66,8 +66,9 @@ export async function triggerTranslateArticles(adminPassword) {
 // ─── Admin: DB stats ─────────────────────────────────────────────────────────
 
 export async function getDBStats() {
-  const [{ count }, { data: tagRows }, { data: logRows }] = await Promise.all([
+  const [{ count }, { count: translatedCount }, { data: tagRows }, { data: logRows }] = await Promise.all([
     supabase.from('articles').select('*', { count: 'exact', head: true }),
+    supabase.from('articles').select('*', { count: 'exact', head: true }).not('title_ar', 'is', null),
     supabase.from('articles').select('tag'),
     supabase.from('fetch_log').select('ran_at, stored, ai_tagged, status, error_msg').order('ran_at', { ascending: false }).limit(5),
   ])
@@ -79,7 +80,8 @@ export async function getDBStats() {
   })
 
   return {
-    total:   count || 0,
+    total:           count || 0,
+    translatedCount: translatedCount || 0,
     byTag,
     recentRuns: logRows || [],
   }

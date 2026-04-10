@@ -138,15 +138,17 @@ export default function AdminPage() {
             <span className="admin-stat-label">Total Articles (DB)</span>
             <span className="admin-stat-value">{loading ? '…' : (stats?.total ?? '–')}</span>
           </div>
+          <div className={`admin-stat-card ${stats && stats.translatedCount >= stats.total ? 'admin-stat-card--ok' : ''}`}>
+            <span className="admin-stat-label">Translated to Arabic</span>
+            <span className="admin-stat-value">
+              {loading ? '…' : stats ? `${stats.translatedCount} / ${stats.total}` : '–'}
+            </span>
+          </div>
           <div className="admin-stat-card">
             <span className="admin-stat-label">Last Server Fetch</span>
             <span className="admin-stat-value" style={{ fontSize: 14 }}>
               {stats?.recentRuns?.[0] ? timeAgo(stats.recentRuns[0].ran_at) : '–'}
             </span>
-          </div>
-          <div className="admin-stat-card admin-stat-card--ok">
-            <span className="admin-stat-label">Data Source</span>
-            <span className="admin-stat-value" style={{ fontSize: 13 }}>Supabase</span>
           </div>
           <div className="admin-stat-card admin-stat-card--ok">
             <span className="admin-stat-label">Auto Refresh</span>
@@ -229,6 +231,17 @@ export default function AdminPage() {
             style={{ marginTop: 0 }}
           >
             {loading ? 'Loading…' : 'Refresh Stats'}
+          </button>
+
+          <button
+            className="admin-btn admin-btn--ghost"
+            onClick={() => {
+              ['ruya_sb_articles','ruya_sb_fetch_time'].forEach(k => localStorage.removeItem(k));
+              setResult({ success: true, message: 'Browser cache cleared. Reload the main page to fetch fresh data.' });
+            }}
+            style={{ marginTop: 0 }}
+          >
+            Clear Browser Cache
           </button>
         </div>
 

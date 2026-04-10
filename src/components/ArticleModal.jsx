@@ -7,13 +7,13 @@ import { timeAgo, getFallbackImage } from '../utils/helpers.js';
 export default function ArticleModal({ article, language, onClose }) {
   const isArabic = language === 'ar';
 
-  const title       = article.title       || '';
+  const title       = isArabic ? (article.title_ar   || article.title   || '') : (article.title   || '');
+  const summary     = isArabic ? (article.summary_ar  || article.summary || article.description || '') : (article.summary || article.description || '');
   const description = article.description || '';
-  const summary     = article.summary     || description;
   const source      = article.source      || '';
   const tag         = article.tag         || '';
   const url         = article.url         || '#';
-  const image       = article.image       || getFallbackImage(title);
+  const image       = article.image       || getFallbackImage(article.title || '');
   const publishedAt = article.publishedAt;
 
   // Close on Escape
