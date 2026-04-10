@@ -17,8 +17,12 @@ async function translateToArabic(
   summary: string,
   key: string
 ): Promise<{ title_ar: string; summary_ar: string } | null> {
-  const prompt = `Translate the following news article title and summary to Arabic naturally and accurately.
-Return JSON only with this exact format: {"title_ar":"...","summary_ar":"..."}
+  // Ask for two separate lines instead of JSON to avoid parse issues
+  const prompt = `Translate the following to Arabic. Reply with exactly 2 lines:
+Line 1: the translated title
+Line 2: the translated summary
+Do not add labels, numbers, or any other text.
+
 Title: ${title}
 Summary: ${summary}`
 
@@ -27,7 +31,7 @@ Summary: ${summary}`
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       contents: [{ parts: [{ text: prompt }] }],
-      generationConfig: { temperature: 0.2, maxOutputTokens: 400 },
+      generationConfig: { temperature: 0.2, maxOutputTokens: 500 },
     }),
   })
 
@@ -35,20 +39,21 @@ Summary: ${summary}`
   const data = await res.json()
   const raw = data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || ''
 
-  try {
-    const cleaned = raw.replace(/```json|```/g, '').trim()
-    const parsed = JSON.parse(cleaned)
-    if (parsed.title_ar && parsed.summary_ar) return parsed
-    return null
-  } catch {
-    // Try to extract with regex fallback
-    const titleMatch = raw.match(/"title_ar"\s*:\s*"([^"]+)"/)
-    const summaryMatch = raw.match(/"summary_ar"\s*:\s*"([^"]+)"/)
-    if (titleMatch && summaryMatch) {
-      return { title_ar: titleMatch[1], summary_ar: summaryMatch[1] }
-    }
-    return null
+  if (!raw) return null
+
+  // Split into lines, filter empty
+  const lines = raw.split('\n').map((l: string) => l.trim()).filter((l: string) => l.length > 0)
+
+  if (lines.length >= 2) {
+    return { title_ar: lines[0], summary_ar: lines.slice(1).join(' ') }
   }
+
+  // Fallback: if only one line returned, use it for both
+  if (lines.length === 1) {
+    return { title_ar: lines[0], summary_ar: lines[0] }
+  }
+
+  return null
 }
 
 Deno.serve(async (req) => {
