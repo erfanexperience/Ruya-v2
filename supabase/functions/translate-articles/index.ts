@@ -86,7 +86,7 @@ Deno.serve(async (req) => {
     .select('url, title, summary, description')
     .is('title_ar', null)
     .not('title', 'is', null)
-    .limit(40)
+    .limit(15)
 
   if (error) {
     return new Response(JSON.stringify({ error: error.message }), {
@@ -134,8 +134,8 @@ Deno.serve(async (req) => {
       failed++
     }
 
-    // 2s delay to respect Gemini free tier rate limit (15 RPM)
-    await new Promise(r => setTimeout(r, 2000))
+    // 1s delay between calls
+    await new Promise(r => setTimeout(r, 1000))
   }
 
   console.log(`[translate-articles] Done: ${translated} translated, ${failed} failed`)

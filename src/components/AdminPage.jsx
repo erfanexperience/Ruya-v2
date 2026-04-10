@@ -272,7 +272,7 @@ export default function AdminPage() {
             }}
             disabled={translating || running}
           >
-            {translating ? 'Translating…' : 'Translate to Arabic (40 articles)'}
+            {translating ? 'Translating…' : 'Translate to Arabic (15 articles)'}
           </button>
         </div>
 
