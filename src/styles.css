@@ -1378,8 +1378,9 @@ html, body {
   .skeleton-img { height: 150px; }
 
   .news-card-flip { height: auto; }
-  .news-card-front,
-  .news-card-back { position: relative; backface-visibility: visible; }
+  .news-card-back { display: none; }
+  .news-card-flip.flipped .news-card-back { display: flex; }
+  .news-card-flip.flipped .news-card-front { display: none; }
 
   /* ── Horizontal cards → switch back to vertical on mobile ──── */
   .news-card--horizontal { height: auto; }
