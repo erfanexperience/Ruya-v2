@@ -236,13 +236,13 @@ export default function AdminPage() {
         <div className="admin-section">
           <h2 className="admin-section-title">Arabic Translation</h2>
           <p className="admin-section-desc">
-            Translates up to 40 untranslated articles to Arabic via Gemini and stores the result permanently in the database. Run this multiple times until all articles are translated. Each article is only ever translated once.
+            Auto-translates all untranslated articles to Arabic via Gemini (5 at a time) and stores them permanently. Keeps running until all articles are done.
           </p>
 
           {translating && (
             <div className="admin-progress">
               <div className="admin-progress-spinner" />
-              <span>Translating up to 40 articles… takes ~60 seconds.</span>
+              <span>{progress || 'Translating… please wait.'}</span>
             </div>
           )}
 
@@ -257,22 +257,48 @@ export default function AdminPage() {
             onClick={async () => {
               setTranslating(true);
               setTranslateResult(null);
+              let totalTranslated = 0;
+              let consecutiveFails = 0;
+              const MAX_FAILS = 3;
+
               try {
-                const res = await triggerTranslateArticles(ADMIN_PASSWORD);
-                setTranslateResult({
-                  success: res.translated > 0,
-                  message: res.message || `Translated ${res.translated} articles. Failed: ${res.failed}.${res.lastError ? ' Error: ' + res.lastError : ''}`,
-                });
-                await loadStats();
+                while (true) {
+                  setProgress(`Translating… ${totalTranslated} done so far`);
+                  const res = await triggerTranslateArticles(ADMIN_PASSWORD);
+
+                  if (res.translated > 0) {
+                    totalTranslated += res.translated;
+                    consecutiveFails = 0;
+                  } else {
+                    consecutiveFails++;
+                  }
+
+                  // All done
+                  if (res.message === 'All articles already translated') {
+                    setTranslateResult({ success: true, message: `Done! ${totalTranslated} articles translated. All articles now have Arabic text.` });
+                    break;
+                  }
+
+                  // Too many consecutive failures — stop
+                  if (consecutiveFails >= MAX_FAILS) {
+                    setTranslateResult({ success: totalTranslated > 0, message: `Stopped after ${consecutiveFails} empty rounds. ${totalTranslated} translated total. Try again later.` });
+                    break;
+                  }
+
+                  // Wait 3s between rounds to avoid rate limits
+                  await new Promise(r => setTimeout(r, 3000));
+                }
               } catch (e) {
-                setTranslateResult({ success: false, message: e.message });
+                setTranslateResult({ success: totalTranslated > 0, message: `${totalTranslated} translated, then error: ${e.message}` });
               } finally {
                 setTranslating(false);
+                setProgress('');
+                await loadStats();
               }
             }}
             disabled={translating || running}
           >
-            {translating ? 'Translating…' : 'Translate to Arabic (15 articles)'}
+            {translating ? 'Translating…' : 'Translate All to Arabic'}
           </button>
         </div>
 
