@@ -754,7 +754,14 @@ html, body {
 
 /* ── Mobile ─────────────────────────────────────────────────────── */
 @media (max-width: 1023px) {
-  .viewport-shell { padding: 0 12px 60px; }
+  .viewport-shell {
+    padding: 0 16px 60px;
+    box-sizing: border-box;
+    width: 100%;
+    overflow-x: hidden;
+  }
+  .bento-grid { width: 100%; box-sizing: border-box; }
+  .above-fold  { width: 100%; box-sizing: border-box; }
 
   .above-fold {
     flex-direction: column;
