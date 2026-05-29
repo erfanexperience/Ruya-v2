@@ -6,6 +6,7 @@ const CACHE_KEYS = {
   SUMMARIES: 'ruya_summaries',
   TRANSLATIONS: 'ruya_translations',
   TAGS: 'ruya_tags',
+  TAITAN_TAKES: 'ruya_taitan_takes',
   LAST_FETCH: 'ruya_last_fetch',
   LAST_AI_RUN: 'ruya_last_ai_run',
   LAST_TRANSLATION_RUN: 'ruya_last_translation_run',
@@ -142,6 +143,38 @@ export function setCachedTag(url, tag) {
   const map = getCachedTags();
   map[url] = tag;
   setCachedTags(map);
+}
+
+// ─── Taitan Takes cache ───────────────────────────────────────────────────────
+
+export function getCachedTaitanTakes() {
+  return getCached(CACHE_KEYS.TAITAN_TAKES) || {};
+}
+
+export function setCachedTaitanTakes(takes) {
+  setCached(CACHE_KEYS.TAITAN_TAKES, takes);
+}
+
+export function getCachedTaitanTake(url) {
+  const map = getCachedTaitanTakes();
+  return map[url] || null;
+}
+
+export function setCachedTaitanTake(url, take) {
+  const map = getCachedTaitanTakes();
+  map[url] = take;
+  setCachedTaitanTakes(map);
+}
+
+export function getCachedTaitanTakeAr(url) {
+  const map = getCachedTaitanTakes();
+  return map[`${url}__ar`] || null;
+}
+
+export function setCachedTaitanTakeAr(url, take) {
+  const map = getCachedTaitanTakes();
+  map[`${url}__ar`] = take;
+  setCachedTaitanTakes(map);
 }
 
 // ─── Translations cache ───────────────────────────────────────────────────────

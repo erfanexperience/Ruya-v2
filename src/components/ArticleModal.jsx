@@ -1,20 +1,50 @@
 // ArticleModal.jsx
 // Full-screen article detail overlay shown when a card is clicked.
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { timeAgo, getFallbackImage } from '../utils/helpers.js';
+import { generateTaitanTake, translateTaitanTake } from '../services/geminiService.js';
 
 export default function ArticleModal({ article, language, onClose }) {
   const isArabic = language === 'ar';
 
   const title       = isArabic ? (article.title_ar   || article.title   || '') : (article.title   || '');
   const summary     = isArabic ? (article.summary_ar  || article.summary || article.description || '') : (article.summary || article.description || '');
-  const description = article.description || '';
   const source      = article.source      || '';
   const tag         = article.tag         || '';
   const url         = article.url         || '#';
   const image       = article.image       || getFallbackImage(article.title || '');
   const publishedAt = article.publishedAt;
+
+  const [take, setTake]               = useState(article.taitanTake || null);
+  const [takeLoading, setTakeLoading] = useState(!article.taitanTake);
+  const [takeAr, setTakeAr]           = useState(null);
+  const [takeArLoading, setTakeArLoading] = useState(false);
+
+  // Step 1 — fetch English Take (from article object or on-demand)
+  useEffect(() => {
+    if (article.taitanTake) { setTake(article.taitanTake); setTakeLoading(false); return; }
+    let cancelled = false;
+    generateTaitanTake(article)
+      .then(t => { if (!cancelled) { setTake(t || null); setTakeLoading(false); } })
+      .catch(() => { if (!cancelled) setTakeLoading(false); });
+    return () => { cancelled = true; };
+  }, [article]);
+
+  // Step 2 — when Arabic mode and English Take is ready, fetch Arabic translation
+  useEffect(() => {
+    if (!isArabic || !take) return;
+    let cancelled = false;
+    setTakeArLoading(true);
+    translateTaitanTake(take, article.url)
+      .then(t => { if (!cancelled) { setTakeAr(t || null); setTakeArLoading(false); } })
+      .catch(() => { if (!cancelled) setTakeArLoading(false); });
+    return () => { cancelled = true; };
+  }, [isArabic, take, article.url]);
+
+  // Displayed take: Arabic translation when ready, fall back to English
+  const displayTake     = isArabic ? (takeAr || take) : take;
+  const displayLoading  = isArabic ? (takeLoading || takeArLoading) : takeLoading;
 
   // Close on Escape
   useEffect(() => {
@@ -78,6 +108,27 @@ export default function ArticleModal({ article, language, onClose }) {
                 </p>
             }
           </div>
+
+          {/* Taitan Take */}
+          {(displayTake || displayLoading) && (
+            <div className="taitan-take">
+              <div className="taitan-take-header">
+                <span className="taitan-take-label">
+                  {isArabic ? 'رأي تايتان' : 'TAITAN TAKE'}
+                </span>
+                <div className="taitan-take-line" />
+              </div>
+              {displayLoading ? (
+                <div className="taitan-take-loading">
+                  <span className="taitan-take-shimmer" />
+                  <span className="taitan-take-shimmer taitan-take-shimmer--mid" />
+                  <span className="taitan-take-shimmer taitan-take-shimmer--short" />
+                </div>
+              ) : (
+                <p className="taitan-take-body">{displayTake}</p>
+              )}
+            </div>
+          )}
 
           {/* Read more link */}
           <div className="article-modal-footer">
