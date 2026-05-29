@@ -13,7 +13,7 @@ export const supabase = createClient(
 export async function fetchArticlesFromDB() {
   const { data, error } = await supabase
     .from('articles')
-    .select('url, title, description, image, published_at, source, source_priority, tag, summary, title_ar, summary_ar')
+    .select('url, title, description, image, published_at, source, source_priority, tag, summary, title_ar, summary_ar, taitan_take')
     .order('published_at', { ascending: false })
     .limit(400)
 
@@ -30,8 +30,9 @@ export async function fetchArticlesFromDB() {
     sourcePriority: a.source_priority || '',
     tag:         a.tag || null,
     summary:     a.summary || a.description || '',
-    title_ar:    a.title_ar || null,
-    summary_ar:  a.summary_ar || null,
+    title_ar:    a.title_ar    || null,
+    summary_ar:  a.summary_ar  || null,
+    taitanTake:  a.taitan_take || null,
   }))
 }
 
@@ -63,12 +64,27 @@ export async function triggerTranslateArticles(adminPassword) {
   return data
 }
 
+// ─── Admin: trigger Taitan Takes generation ───────────────────────────────────
+
+export async function triggerGenerateTakes(adminPassword) {
+  const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-takes`
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-admin-key': adminPassword },
+    body: JSON.stringify({}),
+  })
+  const data = await res.json()
+  if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`)
+  return data
+}
+
 // ─── Admin: DB stats ─────────────────────────────────────────────────────────
 
 export async function getDBStats() {
-  const [{ count }, { count: translatedCount }, { data: tagRows }, { data: logRows }] = await Promise.all([
+  const [{ count }, { count: translatedCount }, { count: takesCount }, { data: tagRows }, { data: logRows }] = await Promise.all([
     supabase.from('articles').select('*', { count: 'exact', head: true }),
     supabase.from('articles').select('*', { count: 'exact', head: true }).not('title_ar', 'is', null),
+    supabase.from('articles').select('*', { count: 'exact', head: true }).not('taitan_take', 'is', null),
     supabase.from('articles').select('tag'),
     supabase.from('fetch_log').select('ran_at, stored, ai_tagged, status, error_msg').order('ran_at', { ascending: false }).limit(5),
   ])
@@ -82,6 +98,7 @@ export async function getDBStats() {
   return {
     total:           count || 0,
     translatedCount: translatedCount || 0,
+    takesCount:      takesCount || 0,
     byTag,
     recentRuns: logRows || [],
   }

@@ -3,7 +3,7 @@
 // Triggers the Supabase edge function for a forced content refresh.
 
 import { useState, useEffect } from 'react';
-import { getDBStats, triggerFetchNews, triggerTranslateArticles } from '../services/supabaseService.js';
+import { getDBStats, triggerFetchNews, triggerTranslateArticles, triggerGenerateTakes } from '../services/supabaseService.js';
 
 const ADMIN_PASSWORD = 'Taitan12@@4';
 
@@ -36,11 +36,13 @@ export default function AdminPage() {
 
   const [stats, setStats]       = useState(null);
   const [loading, setLoading]   = useState(false);
-  const [running, setRunning]         = useState(false);
-  const [translating, setTranslating] = useState(false);
-  const [result, setResult]           = useState(null);
-  const [translateResult, setTranslateResult] = useState(null);
-  const [progress, setProgress]       = useState('');
+  const [running, setRunning]                   = useState(false);
+  const [translating, setTranslating]           = useState(false);
+  const [generatingTakes, setGeneratingTakes]   = useState(false);
+  const [result, setResult]                     = useState(null);
+  const [translateResult, setTranslateResult]   = useState(null);
+  const [takesResult, setTakesResult]           = useState(null);
+  const [progress, setProgress]                 = useState('');
 
   function handleLogin(e) {
     e.preventDefault();
@@ -142,6 +144,12 @@ export default function AdminPage() {
             <span className="admin-stat-label">Translated to Arabic</span>
             <span className="admin-stat-value">
               {loading ? '…' : stats ? `${stats.translatedCount} / ${stats.total}` : '–'}
+            </span>
+          </div>
+          <div className={`admin-stat-card ${stats && stats.takesCount >= stats.total ? 'admin-stat-card--ok' : ''}`}>
+            <span className="admin-stat-label">Taitan Takes</span>
+            <span className="admin-stat-value">
+              {loading ? '…' : stats ? `${stats.takesCount} / ${stats.total}` : '–'}
             </span>
           </div>
           <div className="admin-stat-card">
@@ -312,6 +320,73 @@ export default function AdminPage() {
             disabled={translating || running}
           >
             {translating ? 'Translating…' : 'Translate All to Arabic'}
+          </button>
+        </div>
+
+        {/* Taitan Takes */}
+        <div className="admin-section">
+          <h2 className="admin-section-title">Taitan Takes</h2>
+          <p className="admin-section-desc">
+            Generates a Taitan Take for articles that don't have one yet (5 at a time). Keeps running until all articles are covered. Takes are stored permanently in the database — every visitor sees them instantly without any extra API calls.
+          </p>
+
+          {generatingTakes && (
+            <div className="admin-progress">
+              <div className="admin-progress-spinner" />
+              <span>{progress || 'Generating… please wait.'}</span>
+            </div>
+          )}
+
+          {takesResult && !generatingTakes && (
+            <div className={`admin-alert ${takesResult.success ? 'admin-alert--success' : 'admin-alert--error'}`}>
+              {takesResult.message}
+            </div>
+          )}
+
+          <button
+            className="admin-btn admin-btn--primary"
+            style={{ borderColor: 'var(--accent-orange)', color: 'var(--accent-orange)' }}
+            onClick={async () => {
+              setGeneratingTakes(true);
+              setTakesResult(null);
+              let totalGenerated = 0;
+              let consecutiveDone = 0;
+
+              try {
+                while (true) {
+                  setProgress(`Generating Taitan Takes… ${totalGenerated} done so far`);
+                  const res = await triggerGenerateTakes(ADMIN_PASSWORD);
+
+                  if (res.generated > 0) {
+                    totalGenerated += res.generated;
+                    consecutiveDone = 0;
+                  } else {
+                    consecutiveDone++;
+                  }
+
+                  if (res.message === 'All articles already have a Taitan Take') {
+                    setTakesResult({ success: true, message: `Done! ${totalGenerated} Takes generated. All articles are covered.` });
+                    break;
+                  }
+
+                  if (consecutiveDone >= 3) {
+                    setTakesResult({ success: totalGenerated > 0, message: `Stopped after ${consecutiveDone} empty rounds. ${totalGenerated} generated total. Try again later.` });
+                    break;
+                  }
+
+                  await new Promise(r => setTimeout(r, 3000));
+                }
+              } catch (e) {
+                setTakesResult({ success: totalGenerated > 0, message: `${totalGenerated} generated, then error: ${e.message}` });
+              } finally {
+                setGeneratingTakes(false);
+                setProgress('');
+                await loadStats();
+              }
+            }}
+            disabled={generatingTakes || running}
+          >
+            {generatingTakes ? 'Generating…' : 'Generate All Taitan Takes'}
           </button>
         </div>
 
