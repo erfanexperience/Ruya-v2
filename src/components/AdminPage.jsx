@@ -370,7 +370,8 @@ export default function AdminPage() {
                   }
 
                   if (consecutiveDone >= 3) {
-                    setTakesResult({ success: totalGenerated > 0, message: `Stopped after ${consecutiveDone} empty rounds. ${totalGenerated} generated total. Try again later.` });
+                    const errDetail = res.lastError ? ` Error: ${res.lastError}` : '';
+                    setTakesResult({ success: totalGenerated > 0, message: `Stopped after ${consecutiveDone} empty rounds. ${totalGenerated} generated total.${errDetail}` });
                     break;
                   }
 

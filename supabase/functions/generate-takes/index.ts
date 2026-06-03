@@ -10,8 +10,6 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 }
 
-const GEMINI_MODEL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent'
-
 const SYSTEM_PROMPT = `You are a world-class business strategist with twenty years of operating experience across Saudi Arabia and Silicon Valley. You write with the authority of someone who has actually closed deals on both sides of the bridge — not a journalist, not an analyst, not a consultant pitching a deck. Your voice is direct, evidence-led, and allergic to hype. Think Patrick McKenzie at Stripe Press, Ben Thompson at Stratechery, or a senior McKinsey partner briefing a CIO before a board meeting.
 
 Write a single-paragraph Taitan Take that contextualises a news article for any reader, anywhere in the world. The Take is not a summary — the reader already has the article. The Take is the strategic explanation of what a sophisticated reader is most likely to misunderstand, under-size, or miss entirely about what the article actually means — read through the lens of Taitan Global, the firm that brings the best American companies into Saudi Arabia.
@@ -64,20 +62,41 @@ async function sleep(ms: number) {
   return new Promise(r => setTimeout(r, ms))
 }
 
-async function callGemini(userMessage: string, key: string): Promise<string> {
-  const res = await fetch(`${GEMINI_MODEL}?key=${key}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
-      contents: [{ parts: [{ text: userMessage }] }],
-      generationConfig: { temperature: 0.4, maxOutputTokens: 350 },
-    }),
-  })
-  if (res.status === 429 || res.status === 503) throw new Error(`Rate limited: ${res.status}`)
-  if (!res.ok) throw new Error(`Gemini ${res.status}: ${(await res.text()).slice(0, 200)}`)
-  const data = await res.json()
-  return data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || ''
+const GEMINI_MODELS = [
+  'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent',
+  'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent',
+]
+
+async function callGemini(fullPrompt: string, key: string): Promise<string> {
+  for (const modelUrl of GEMINI_MODELS) {
+    try {
+      const res = await fetch(`${modelUrl}?key=${key}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: fullPrompt }] }],
+          generationConfig: { temperature: 0.4, maxOutputTokens: 400 },
+        }),
+      })
+      if (res.status === 429 || res.status === 503) {
+        console.warn(`[generate-takes] ${res.status} from ${modelUrl} — trying next model`)
+        await sleep(1000)
+        continue
+      }
+      if (!res.ok) {
+        const errText = await res.text()
+        console.warn(`[generate-takes] Error ${res.status} from ${modelUrl}: ${errText.slice(0, 200)}`)
+        continue
+      }
+      const data = await res.json()
+      const text = data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || ''
+      if (text) return text
+      console.warn(`[generate-takes] Empty response from ${modelUrl}`)
+    } catch (e: any) {
+      console.warn(`[generate-takes] Network error from ${modelUrl}: ${e.message}`)
+    }
+  }
+  throw new Error('All Gemini models failed')
 }
 
 Deno.serve(async (req) => {
@@ -128,11 +147,19 @@ Deno.serve(async (req) => {
 
   let generated = 0
   let failed = 0
+  let lastError = ''
 
   for (const article of articles) {
     try {
-      const userMessage = `Write the Taitan Take for the article below. Return only the paragraph.\n\nARTICLE:\nTitle: ${article.title}\n${article.description ? `Content: ${article.description}` : ''}`
-      const take = await callGemini(userMessage, GEMINI_KEY)
+      const fullPrompt = `${SYSTEM_PROMPT}
+
+Write the Taitan Take for the article below. Return only the paragraph.
+
+ARTICLE:
+Title: ${article.title}
+${article.description ? `Content: ${article.description}` : ''}`
+
+      const take = await callGemini(fullPrompt, GEMINI_KEY)
 
       if (take) {
         const { error: updateErr } = await supabase
@@ -142,26 +169,29 @@ Deno.serve(async (req) => {
 
         if (updateErr) {
           console.warn('[generate-takes] DB update failed:', updateErr.message)
+          lastError = `DB: ${updateErr.message}`
           failed++
         } else {
           generated++
           console.log(`[generate-takes] ✓ "${article.title.slice(0, 60)}"`)
         }
       } else {
+        lastError = 'Empty response from Gemini'
         failed++
       }
     } catch (e: any) {
+      lastError = e.message
       console.warn('[generate-takes] Failed for:', article.title?.slice(0, 60), '—', e.message)
       failed++
     }
 
-    await sleep(1500) // stay under Gemini rate limit
+    await sleep(1500)
   }
 
-  console.log(`[generate-takes] Done: ${generated} generated, ${failed} failed`)
+  console.log(`[generate-takes] Done: ${generated} generated, ${failed} failed${lastError ? ` — last error: ${lastError}` : ''}`)
 
   return new Response(
-    JSON.stringify({ success: true, generated, failed }),
+    JSON.stringify({ success: true, generated, failed, lastError }),
     { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
   )
 })
