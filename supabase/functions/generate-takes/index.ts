@@ -68,35 +68,40 @@ const GEMINI_MODELS = [
 ]
 
 async function callGemini(fullPrompt: string, key: string): Promise<string> {
+  let lastErr = 'no attempt made'
   for (const modelUrl of GEMINI_MODELS) {
+    const modelName = modelUrl.split('/models/')[1]?.split(':')[0] || modelUrl
     try {
       const res = await fetch(`${modelUrl}?key=${key}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           contents: [{ parts: [{ text: fullPrompt }] }],
-          generationConfig: { temperature: 0.4, maxOutputTokens: 400 },
+          generationConfig: { temperature: 0.4, maxOutputTokens: 600 },
         }),
       })
       if (res.status === 429 || res.status === 503) {
-        console.warn(`[generate-takes] ${res.status} from ${modelUrl} — trying next model`)
+        lastErr = `${modelName}: rate limited (${res.status})`
         await sleep(1000)
         continue
       }
       if (!res.ok) {
         const errText = await res.text()
-        console.warn(`[generate-takes] Error ${res.status} from ${modelUrl}: ${errText.slice(0, 200)}`)
+        lastErr = `${modelName} HTTP ${res.status}: ${errText.slice(0, 400)}`
+        console.warn(`[generate-takes] ${lastErr}`)
         continue
       }
       const data = await res.json()
       const text = data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || ''
       if (text) return text
-      console.warn(`[generate-takes] Empty response from ${modelUrl}`)
+      lastErr = `${modelName}: empty response`
+      console.warn(`[generate-takes] Empty response`)
     } catch (e: any) {
-      console.warn(`[generate-takes] Network error from ${modelUrl}: ${e.message}`)
+      lastErr = `${modelName}: network error — ${e.message}`
+      console.warn(`[generate-takes] ${lastErr}`)
     }
   }
-  throw new Error('All Gemini models failed')
+  throw new Error(lastErr)
 }
 
 Deno.serve(async (req) => {
@@ -161,7 +166,8 @@ ${article.description ? `Content: ${article.description}` : ''}`
 
       const take = await callGemini(fullPrompt, GEMINI_KEY)
 
-      if (take) {
+      // Reject takes that are too short to be a real paragraph (< 200 chars ≈ < 3 sentences)
+      if (take && take.length >= 200) {
         const { error: updateErr } = await supabase
           .from('articles')
           .update({ taitan_take: take })
@@ -173,8 +179,12 @@ ${article.description ? `Content: ${article.description}` : ''}`
           failed++
         } else {
           generated++
-          console.log(`[generate-takes] ✓ "${article.title.slice(0, 60)}"`)
+          console.log(`[generate-takes] ✓ "${article.title.slice(0, 60)}" (${take.length} chars)`)
         }
+      } else if (take && take.length < 200) {
+        lastError = `Take too short (${take.length} chars): "${take.slice(0, 80)}"`
+        console.warn('[generate-takes] Rejected short take:', lastError)
+        failed++
       } else {
         lastError = 'Empty response from Gemini'
         failed++
@@ -185,7 +195,7 @@ ${article.description ? `Content: ${article.description}` : ''}`
       failed++
     }
 
-    await sleep(1500)
+    await sleep(4000) // 15 RPM free tier = 1 call per 4s
   }
 
   console.log(`[generate-takes] Done: ${generated} generated, ${failed} failed${lastError ? ` — last error: ${lastError}` : ''}`)

@@ -1937,6 +1937,40 @@ html, body {
   .article-modal-body { padding: 20px 20px 40px; }
 }
 
+/* ─── Taitan Take — Card Preview ─────────────────────────────────────────────── */
+.news-card-take {
+  margin-top: 10px;
+  padding: 8px 10px 8px 12px;
+  border-left: 2px solid var(--accent-orange);
+  background: rgba(255, 107, 53, 0.05);
+  border-radius: 0 4px 4px 0;
+}
+
+.news-card-take-label {
+  display: block;
+  font-family: var(--font-display);
+  font-size: 7px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  color: var(--accent-orange);
+  margin-bottom: 4px;
+  opacity: 0.85;
+}
+
+.news-card-take-text {
+  font-family: var(--font-body);
+  font-size: 11px;
+  line-height: 1.55;
+  color: rgba(200, 216, 224, 0.75);
+  margin: 0;
+}
+
+[dir="rtl"] .news-card-take {
+  border-left: none;
+  border-right: 2px solid var(--accent-orange);
+  border-radius: 4px 0 0 4px;
+}
+
 /* ─── Taitan Take ────────────────────────────────────────────────────────────── */
 .taitan-take {
   border-left: 2px solid var(--accent-orange);

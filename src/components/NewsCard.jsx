@@ -30,6 +30,15 @@ export default function NewsCard({ article, index = 0, language = 'en', size = '
   const image       = article.image       || getFallbackImage(article.title);
   const publishedAt = article.publishedAt;
 
+  // Taitan Take — first sentence only for card preview
+  const rawTake     = article.taitanTake || null;
+  const takePreview = rawTake
+    ? (() => {
+        const first = rawTake.split(/(?<=\.)\s/)[0] || rawTake;
+        return first.length > 140 ? first.slice(0, 137) + '…' : first;
+      })()
+    : null;
+
   // Flip label
   const flipLabel = isFlipped
     ? (isArabic ? 'رجوع' : 'Back')
@@ -117,6 +126,12 @@ export default function NewsCard({ article, index = 0, language = 'en', size = '
                 {tag && <span className="news-card-tag">{tag}</span>}
                 <h3 className="news-card-title">{title}</h3>
                 <p className="news-card-summary">{truncate(summary, 160)}</p>
+                {takePreview && (
+                  <div className="news-card-take">
+                    <span className="news-card-take-label">TAITAN TAKE</span>
+                    <p className="news-card-take-text">{takePreview}</p>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -162,6 +177,12 @@ export default function NewsCard({ article, index = 0, language = 'en', size = '
             {tag && <span className="news-card-tag">{tag}</span>}
             <h3 className="news-card-title">{title}</h3>
             <p className="news-card-summary">{truncate(summary, isWide ? 220 : 140)}</p>
+            {takePreview && (
+              <div className="news-card-take">
+                <span className="news-card-take-label">TAITAN TAKE</span>
+                <p className="news-card-take-text">{takePreview}</p>
+              </div>
+            )}
           </div>
         </div>
         {/* BACK — other language */}
