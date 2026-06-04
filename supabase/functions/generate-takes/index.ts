@@ -63,8 +63,9 @@ async function sleep(ms: number) {
 }
 
 const GEMINI_MODELS = [
-  'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent',
   'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent',
+  'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent',
+  'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent',
 ]
 
 async function callGemini(fullPrompt: string, key: string): Promise<string> {
@@ -92,10 +93,15 @@ async function callGemini(fullPrompt: string, key: string): Promise<string> {
         continue
       }
       const data = await res.json()
-      const text = data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || ''
-      if (text) return text
-      lastErr = `${modelName}: empty response`
-      console.warn(`[generate-takes] Empty response`)
+      const candidate = data?.candidates?.[0]
+      const finishReason = candidate?.finishReason || 'UNKNOWN'
+      const text = candidate?.content?.parts?.[0]?.text?.trim() || ''
+      if (text) {
+        console.log(`[generate-takes] ${modelName} OK — ${text.length} chars, finish: ${finishReason}`)
+        return text
+      }
+      lastErr = `${modelName}: empty response (finish: ${finishReason})`
+      console.warn(`[generate-takes] ${lastErr}`)
     } catch (e: any) {
       lastErr = `${modelName}: network error — ${e.message}`
       console.warn(`[generate-takes] ${lastErr}`)
@@ -127,13 +133,13 @@ Deno.serve(async (req) => {
     Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
   )
 
-  // Fetch 5 articles missing a Taitan Take
+  // Fetch 3 articles missing a Taitan Take (smaller batch = more reliable)
   const { data: articles, error } = await supabase
     .from('articles')
     .select('url, title, description, summary')
     .is('taitan_take', null)
     .not('title', 'is', null)
-    .limit(5)
+    .limit(3)
 
   if (error) {
     return new Response(JSON.stringify({ error: error.message }), {
