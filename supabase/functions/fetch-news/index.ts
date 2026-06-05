@@ -27,10 +27,10 @@ interface Article {
 
 const RSS_PROXY = 'https://api.rss2json.com/v1/api.json?rss_url='
 const RSS_FEEDS = [
-  { url: 'https://www.arabnews.com/rss.xml',            source: 'Arab News' },
-  { url: 'https://techcrunch.com/feed/',                source: 'TechCrunch' },
-  { url: 'https://www.theverge.com/rss/index.xml',      source: 'The Verge' },
-  { url: 'https://www.technologyreview.com/feed/',      source: 'MIT Tech Review' },
+  { url: 'https://www.arabnews.com/rss.xml',              source: 'Arab News' },
+  { url: 'https://saudigazette.com.sa/feed',              source: 'Saudi Gazette' },
+  { url: 'https://english.alarabiya.net/rss.xml',         source: 'Al Arabiya' },
+  { url: 'https://www.spa.gov.sa/rss.xml',                source: 'Saudi Press Agency' },
 ]
 
 const NEWSAPI_QUERIES: [string, string | null][] = [
@@ -224,52 +224,32 @@ const BLOCKLIST = [
   'horoscope', 'astrology',
 ]
 
-const TECH_KEYWORDS = [
-  // AI
-  'artificial intelligence', 'machine learning', 'deep learning', 'neural network',
-  'chatgpt', 'openai', 'gemini', 'llm', 'generative ai', 'ai model',
-  // Robotics / autonomous
-  'robotics', 'autonomous vehicle', 'self-driving', 'drone',
-  // Security
-  'cybersecurity', 'cyber security', 'cyberattack', 'ransomware', 'data breach', 'hacking',
-  // Hardware
-  'semiconductor', 'microchip', 'gpu', 'processor chip',
-  // Connectivity
-  '5g', '6g', 'broadband', 'fiber optic', 'telecom', 'satellite internet',
-  // Tech business
-  'blockchain', 'quantum computing', 'cloud computing', 'data center',
-  'startup', 'venture capital', 'fintech', 'edtech', 'healthtech',
-  'tech company', 'technology company', 'software', 'digital platform', 'mobile app',
-  // Saudi-specific tech
-  'neom', 'vision 2030', 'sdaia', 'smart city', 'giga project', 'digital transformation',
-  'savvy games', 'qiddiya', 'sindalah', 'the line',
-  // Entertainment tech
-  'esports', 'gaming', 'metaverse', 'virtual reality', 'augmented reality',
-  // Innovation
-  'innovation', 'technology', 'digital economy', 'tech hub',
-]
-
+// EVERY article must mention Saudi Arabia or the region to be stored
 const SAUDI_KEYWORDS = [
   'saudi', 'riyadh', 'jeddah', 'ksa', 'neom', 'vision 2030', 'aramco',
-  'stc', 'mobily', 'sdaia', 'gulf', 'middle east', 'mena', 'arab',
-  'uae', 'dubai', 'abu dhabi', 'qatar', 'kuwait', 'bahrain', 'oman',
-  'savvy games', 'pif', 'saudi fund',
+  'stc group', 'stc pay', 'mobily', 'sdaia', 'saudi telecom',
+  'savvy games', 'pif ', 'saudi fund', 'saudi public investment',
+  'qiddiya', 'sindalah', 'diriyah', 'the line', 'oxagon', 'trojena',
+  'saudi arabia', 'kingdom of saudi',
 ]
 
-const PURE_TECH_SOURCES = ['TechCrunch', 'The Verge', 'MIT Tech Review']
+// Secondary: regional signals — accepted only if combined with Saudi signals
+const REGIONAL_KEYWORDS = [
+  'gulf', 'middle east', 'mena', 'arab world',
+  'uae', 'dubai', 'abu dhabi', 'qatar', 'kuwait', 'bahrain', 'oman',
+]
 
 function passesFilter(a: Article): boolean {
   if (!a.title || a.title.length < 10) return false
-  // Skip [Removed] articles (NewsAPI free tier)
   if (a.title.includes('[Removed]') || a.description?.includes('[Removed]')) return false
   const text = ` ${a.title} ${a.description} `.toLowerCase()
   if (BLOCKLIST.some(kw => text.includes(kw))) return false
-  // Pre-tagged articles: just need one relevance signal
-  if (a.tag) return TECH_KEYWORDS.some(kw => text.includes(kw)) || SAUDI_KEYWORDS.some(kw => text.includes(kw))
-  // Pure tech sources: only need tech keyword
-  if (PURE_TECH_SOURCES.includes(a.source)) return TECH_KEYWORDS.some(kw => text.includes(kw))
-  // Others: need BOTH tech AND Saudi
-  return TECH_KEYWORDS.some(kw => text.includes(kw)) && SAUDI_KEYWORDS.some(kw => text.includes(kw))
+
+  // HARD REQUIREMENT: must mention Saudi Arabia directly
+  const hasSaudi = SAUDI_KEYWORDS.some(kw => text.includes(kw))
+  if (!hasSaudi) return false
+
+  return true
 }
 
 // ─── Deduplication ────────────────────────────────────────────────────────────
@@ -437,8 +417,8 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Also remove articles older than 30 days regardless of count
-    const cutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
+    // Keep only last 4 days of articles — removes stale news automatically
+    const cutoff = new Date(Date.now() - 4 * 24 * 60 * 60 * 1000).toISOString()
     await supabase.from('articles').delete().lt('published_at', cutoff)
 
     // ── 4. Upsert in batches of 50 ────────────────────────────────────────────

@@ -1,6 +1,6 @@
 // supabase/functions/generate-takes/index.ts
-// Edge function — generates Taitan Takes server-side for articles missing one.
-// Called by: admin panel. Processes 5 articles per call (avoids 150s timeout).
+// Generates Taitan Takes server-side for articles missing one.
+// Called by: admin panel or daily cron. Processes 3 articles per call.
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
@@ -10,57 +10,27 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 }
 
-const SYSTEM_PROMPT = `You are a world-class business strategist with twenty years of operating experience across Saudi Arabia and Silicon Valley. You write with the authority of someone who has actually closed deals on both sides of the bridge — not a journalist, not an analyst, not a consultant pitching a deck. Your voice is direct, evidence-led, and allergic to hype. Think Patrick McKenzie at Stripe Press, Ben Thompson at Stratechery, or a senior McKinsey partner briefing a CIO before a board meeting.
+// Condensed prompt — same voice and constraints, half the tokens
+const SYSTEM_PROMPT = `You are a senior business strategist fluent in Saudi Arabia and Silicon Valley. Write a TAITAN TAKE — a single paragraph of strategic analysis for a news article. This is NOT a summary. It explains what a sophisticated global reader is most likely to miss or undersize about the article, read through the lens of Taitan Global (the firm that brings the best American companies to Saudi Arabia).
 
-Write a single-paragraph Taitan Take that contextualises a news article for any reader, anywhere in the world. The Take is not a summary — the reader already has the article. The Take is the strategic explanation of what a sophisticated reader is most likely to misunderstand, under-size, or miss entirely about what the article actually means — read through the lens of Taitan Global, the firm that brings the best American companies into Saudi Arabia.
+SAUDI FACTS — cite at least one:
+- Saudi GDP ~$1.07T (2024), G20, ~17th largest globally
+- PIF (Public Investment Fund) ~$925B AUM, target $2T by 2030
+- HUMAIN: PIF's AI champion, 18,000 Nvidia Blackwell GPUs, launched May 2025
+- Vision 2030: launched 2016, diversification from oil; giga-projects include NEOM, The Line, Qiddiya, Red Sea Global, Diriyah Gate, AlUla
+- Capital moves faster than US institutional cycles — billion-dollar decisions in weeks
+- Women's workforce participation: 17% (2017) to 36%+ (2024)
+- Riyadh: 7-8M population, growing to 15M by 2030
+- 2034 FIFA World Cup host, Expo 2030, F1, LIV Golf
 
-ABOUT TAITAN GLOBAL
-Taitan Global (taitanglobal.ai) is a curated-access firm that brings exceptional American companies — primarily from Silicon Valley — into Saudi Arabia under an equity-plus-fee model. Taitan is not an AI consultancy, not a translator, not a sourcing firm. Positioning: "The firm that brings the best American companies to Saudi Arabia." Every Take is written through this lens: how the article connects to the bi-national US ↔ KSA bridge of capital, talent, and operational scale.
-
-SAUDI ARABIA — THE FACTS MOST READERS GET WRONG
-Use these facts to ground every Take. Cite at least one of them by name in the paragraph. Do not invent additional numbers.
-- GDP ~$1.07 trillion (2024). Saudi is a G20 economy, roughly the 17th largest globally. Not small.
-- Population ~34 million, median age ~30. Younger and larger than most European countries.
-- Public Investment Fund (PIF) ~$925B AUM, target $2T by 2030. One of the world's largest sovereign wealth funds.
-- Vision 2030 — the national transformation programme launched April 2016 under Crown Prince Mohammed bin Salman. Economic diversification away from oil, institutional reform, giga-project deployment.
-- Active giga-projects: NEOM (including The Line and Trojena), Red Sea Global, Diriyah Gate, Qiddiya, AlUla, Roshn, Sindalah. Combined capital deployment in the hundreds of billions.
-- HUMAIN — PIF's national AI champion, launched May 2025 with multi-billion-dollar partnerships across Nvidia (18,000 Blackwell GPUs), AMD, AWS, Cisco, Qualcomm. Saudi is now a Tier-1 sovereign AI buyer and operator.
-- Capital velocity. Multi-billion-dollar decisions move in weeks, not quarters. KSA capital is materially faster than US institutional capital cycles.
-- Reforms have landed structurally, not cosmetically. Women's labour-force participation rose from ~17% (2017) to ~36%+ (2024). General tourism visa launched 2019. Entertainment authority, F1, LIV Golf, Saudi Pro League, 2034 FIFA World Cup hosting rights, Expo 2030.
-- Riyadh population ~7–8M, growing toward 15M by 2030. A megacity in formation.
-- Non-oil share of government revenue has risen sharply under Vision 2030; oil is no longer the only story.
-
-COMMON MISREADS TO ACTIVELY CORRECT (WHERE THE ARTICLE ALLOWS)
-- "Saudi is small." → It is G20, ~17th-largest economy globally.
-- "Capital moves slowly there." → It is faster than US institutional cycles.
-- "Reforms are theater." → Labour participation, tourism, entertainment, sport, and regulation have structurally changed.
-- "It's just oil money." → Non-oil is now the larger growth story.
-- "You need royal connections to do business." → False. Cultural fluency and relationships matter, but the deal architecture is institutional.
-- "Saudi equals UAE." → Different regulatory regimes, different capital sources, different sectoral focus.
-- "Vision 2030 is one man's project." → Institutionalised across PIF, ministries, and the giga-projects.
-- "Riyadh is provincial." → It is a megacity on track for 15M.
-
-AUDIENCE POSTURE
-Write for a globally sophisticated reader — could be a CIO in São Paulo, a founder in Singapore, an investor in London, a journalist in Lagos, or an operator in Toronto. Do not assume a US or Western frame of reference. Do not reference where the reader lives. Speak universally and let the analysis carry.
-
-OUTPUT SPECIFICATION (HARD CONSTRAINTS)
-- Exactly ONE paragraph. No headings, no bullets, no line breaks, no lists, no sub-paragraphs.
-- 120 to 180 words. If the draft falls outside the range, rewrite until it lands inside.
-- 5 to 7 sentences. No more, no fewer.
-- Open with the strategic frame, not with "This article is about…"
-- Cite at least one specific number, named institution, named giga-project, or named figure from the facts above.
-- Close with the bi-national so-what: what the article means for the bridge between Silicon Valley / US operators and Saudi Arabia.
-- Voice: business strategist explaining the real picture to a smart, sceptical reader. Confident. Specific. Zero hype. No emoji.
-- No regional framing. Do not write "From North America…" or "For European readers…" or "In the West…"
-- No marketing copy for Taitan. A single closing reference is fine when natural; never a sales pitch.
-- No predictions phrased as certainty. If you must speculate, use a hedged verb ("suggests," "points toward," "signals").
-- Grounding rule: State only what you can verify from the article and the facts above. If the article has no plausible Saudi or Silicon Valley angle, write one honest sentence saying there is no material Vision 2030 connection — do not invent one.
-
-Return ONLY the paragraph. No preamble. No header. No metadata. No trailing notes.`
-
-async function sleep(ms: number) {
-  return new Promise(r => setTimeout(r, ms))
-}
+OUTPUT RULES — follow exactly:
+- ONE paragraph only. No headings, bullets, or line breaks.
+- 120 to 180 words. 5 to 7 sentences.
+- Open with the strategic frame, NOT "This article is about..."
+- Close with the US-to-Saudi bridge: what this means for American operators entering Saudi Arabia
+- Voice: confident, evidence-led strategist. No hype, no emoji.
+- No regional framing ("For Western readers...", "In the US...")
+- Return ONLY the paragraph. No preamble, no labels, no notes.`
 
 const GEMINI_MODELS = [
   'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent',
@@ -68,7 +38,11 @@ const GEMINI_MODELS = [
   'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent',
 ]
 
-async function callGemini(fullPrompt: string, key: string): Promise<string> {
+async function sleep(ms: number) {
+  return new Promise(r => setTimeout(r, ms))
+}
+
+async function callGemini(prompt: string, key: string): Promise<string> {
   let lastErr = 'no attempt made'
   for (const modelUrl of GEMINI_MODELS) {
     const modelName = modelUrl.split('/models/')[1]?.split(':')[0] || modelUrl
@@ -77,18 +51,18 @@ async function callGemini(fullPrompt: string, key: string): Promise<string> {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          contents: [{ parts: [{ text: fullPrompt }] }],
+          contents: [{ parts: [{ text: prompt }] }],
           generationConfig: { temperature: 0.4, maxOutputTokens: 600 },
         }),
       })
       if (res.status === 429 || res.status === 503) {
         lastErr = `${modelName}: rate limited (${res.status})`
-        await sleep(1000)
+        await sleep(2000)
         continue
       }
       if (!res.ok) {
         const errText = await res.text()
-        lastErr = `${modelName} HTTP ${res.status}: ${errText.slice(0, 400)}`
+        lastErr = `${modelName} HTTP ${res.status}: ${errText.slice(0, 300)}`
         console.warn(`[generate-takes] ${lastErr}`)
         continue
       }
@@ -133,7 +107,6 @@ Deno.serve(async (req) => {
     Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
   )
 
-  // Fetch 3 articles missing a Taitan Take (smaller batch = more reliable)
   const { data: articles, error } = await supabase
     .from('articles')
     .select('url, title, description, summary')
@@ -162,17 +135,9 @@ Deno.serve(async (req) => {
 
   for (const article of articles) {
     try {
-      const fullPrompt = `${SYSTEM_PROMPT}
-
-Write the Taitan Take for the article below. Return only the paragraph.
-
-ARTICLE:
-Title: ${article.title}
-${article.description ? `Content: ${article.description}` : ''}`
-
+      const fullPrompt = `${SYSTEM_PROMPT}\n\nWrite the Taitan Take for the article below. Return only the paragraph.\n\nARTICLE:\nTitle: ${article.title}\n${article.description ? `Content: ${article.description}` : ''}`
       const take = await callGemini(fullPrompt, GEMINI_KEY)
 
-      // Reject takes that are too short to be a real paragraph (< 200 chars ≈ < 3 sentences)
       if (take && take.length >= 200) {
         const { error: updateErr } = await supabase
           .from('articles')
@@ -180,31 +145,28 @@ ${article.description ? `Content: ${article.description}` : ''}`
           .eq('url', article.url)
 
         if (updateErr) {
-          console.warn('[generate-takes] DB update failed:', updateErr.message)
           lastError = `DB: ${updateErr.message}`
           failed++
         } else {
           generated++
-          console.log(`[generate-takes] ✓ "${article.title.slice(0, 60)}" (${take.length} chars)`)
+          console.log(`[generate-takes] OK "${article.title.slice(0, 50)}" (${take.length} chars)`)
         }
-      } else if (take && take.length < 200) {
+      } else if (take) {
         lastError = `Take too short (${take.length} chars): "${take.slice(0, 80)}"`
-        console.warn('[generate-takes] Rejected short take:', lastError)
+        console.warn(`[generate-takes] Rejected: ${lastError}`)
         failed++
       } else {
-        lastError = 'Empty response from Gemini'
+        lastError = 'Empty response'
         failed++
       }
     } catch (e: any) {
       lastError = e.message
-      console.warn('[generate-takes] Failed for:', article.title?.slice(0, 60), '—', e.message)
+      console.warn(`[generate-takes] Failed: ${e.message}`)
       failed++
     }
 
-    await sleep(4000) // 15 RPM free tier = 1 call per 4s
+    await sleep(4000)
   }
-
-  console.log(`[generate-takes] Done: ${generated} generated, ${failed} failed${lastError ? ` — last error: ${lastError}` : ''}`)
 
   return new Response(
     JSON.stringify({ success: true, generated, failed, lastError }),

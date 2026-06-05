@@ -39,9 +39,11 @@ export default function AdminPage() {
   const [running, setRunning]                   = useState(false);
   const [translating, setTranslating]           = useState(false);
   const [generatingTakes, setGeneratingTakes]   = useState(false);
+  const [pipelineRunning, setPipelineRunning]   = useState(false);
   const [result, setResult]                     = useState(null);
   const [translateResult, setTranslateResult]   = useState(null);
   const [takesResult, setTakesResult]           = useState(null);
+  const [pipelineResult, setPipelineResult]     = useState(null);
   const [progress, setProgress]                 = useState('');
 
   function handleLogin(e) {
@@ -162,6 +164,80 @@ export default function AdminPage() {
             <span className="admin-stat-label">Auto Refresh</span>
             <span className="admin-stat-value" style={{ fontSize: 13 }}>Daily 07:00 AST</span>
           </div>
+        </div>
+
+        {/* ── Run Full Pipeline ─────────────────────────────────────────────── */}
+        <div className="admin-section" style={{ borderColor: 'rgba(0,255,136,0.3)', background: 'rgba(0,255,136,0.02)' }}>
+          <h2 className="admin-section-title">Run Full Pipeline</h2>
+          <p className="admin-section-desc">
+            Runs all three steps in sequence: fetch latest articles → translate to Arabic → generate Taitan Takes. Same as the daily 07:00 AST automation — use this for an on-demand full refresh.
+          </p>
+
+          {pipelineRunning && (
+            <div className="admin-progress">
+              <div className="admin-progress-spinner" />
+              <span>{progress || 'Running pipeline…'}</span>
+            </div>
+          )}
+
+          {pipelineResult && !pipelineRunning && (
+            <div className={`admin-alert ${pipelineResult.success ? 'admin-alert--success' : 'admin-alert--error'}`}>
+              {pipelineResult.message}
+            </div>
+          )}
+
+          <button
+            className="admin-btn admin-btn--primary"
+            style={{ borderColor: 'var(--accent-green)', color: 'var(--accent-green)' }}
+            onClick={async () => {
+              setPipelineRunning(true);
+              setPipelineResult(null);
+              const sleep = ms => new Promise(r => setTimeout(r, ms));
+              try {
+                // Step 1: Fetch
+                setProgress('Step 1/3 — Fetching latest articles…');
+                const fetchRes = await triggerFetchNews(ADMIN_PASSWORD);
+
+                // Step 2: Translate (loop until done)
+                setProgress('Step 2/3 — Translating to Arabic…');
+                let translated = 0;
+                let transFails = 0;
+                while (transFails < 3) {
+                  const res = await triggerTranslateArticles(ADMIN_PASSWORD);
+                  if (res.translated > 0) { translated += res.translated; transFails = 0; }
+                  else transFails++;
+                  if (res.message === 'All articles already translated') break;
+                  await sleep(3000);
+                }
+
+                // Step 3: Takes (loop until done)
+                setProgress('Step 3/3 — Generating Taitan Takes…');
+                let takes = 0;
+                let takesFails = 0;
+                while (takesFails < 3) {
+                  const res = await triggerGenerateTakes(ADMIN_PASSWORD);
+                  if (res.generated > 0) { takes += res.generated; takesFails = 0; }
+                  else takesFails++;
+                  if (res.message === 'All articles already have a Taitan Take') break;
+                  await sleep(3000);
+                }
+
+                setPipelineResult({
+                  success: true,
+                  message: `Pipeline complete. Fetched: ${fetchRes.stored} articles stored. Translated: ${translated}. Takes: ${takes} generated.`,
+                });
+                await loadStats();
+              } catch (e) {
+                setPipelineResult({ success: false, message: `Pipeline error: ${e.message}` });
+              } finally {
+                setPipelineRunning(false);
+                setProgress('');
+              }
+            }}
+            disabled={pipelineRunning || running || translating || generatingTakes}
+          >
+            {pipelineRunning ? progress || 'Running…' : 'Run Full Pipeline'}
+          </button>
         </div>
 
         {/* Category breakdown */}
