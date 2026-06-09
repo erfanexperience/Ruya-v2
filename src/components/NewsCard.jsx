@@ -7,9 +7,10 @@ import { useState, useRef, useEffect } from 'react';
 import { timeAgo, truncate, getFallbackImage, staggerDelay } from '../utils/helpers.js';
 
 export default function NewsCard({ article, index = 0, language = 'en', size = 'normal', layout = 'vertical', onSelect }) {
-  const [isFlipped, setIsFlipped]   = useState(false);
-  const [imgLoaded, setImgLoaded]   = useState(false);
-  const [imgError, setImgError]     = useState(false);
+  const [isFlipped, setIsFlipped]       = useState(false);
+  const [imgLoaded, setImgLoaded]       = useState(false);
+  const [imgError, setImgError]         = useState(false);
+  const [takeExpanded, setTakeExpanded] = useState(false);
 
   const cardRef    = useRef(null);
   const magnetRef  = useRef({ x: 0, y: 0, rafId: null });
@@ -127,9 +128,20 @@ export default function NewsCard({ article, index = 0, language = 'en', size = '
                 <h3 className="news-card-title">{title}</h3>
                 <p className="news-card-summary">{truncate(summary, 160)}</p>
                 {takePreview && (
-                  <div className="news-card-take">
-                    <span className="news-card-take-label">TAITAN TAKE</span>
-                    <p className="news-card-take-text">{takePreview}</p>
+                  <div
+                    className={`news-card-take${takeExpanded ? ' news-card-take--expanded' : ''}`}
+                    onClick={e => { e.stopPropagation(); setTakeExpanded(x => !x); }}
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={e => { if (e.key === 'Enter') { e.stopPropagation(); setTakeExpanded(x => !x); }}}
+                  >
+                    <div className="news-card-take-header">
+                      <span className="news-card-take-label">{isArabic ? 'رأي تايتان' : 'TAITAN TAKE'}</span>
+                      <span className="news-card-take-toggle">{takeExpanded ? '▲' : '▼'}</span>
+                    </div>
+                    <p className="news-card-take-text">
+                      {takeExpanded ? rawTake : takePreview}
+                    </p>
                   </div>
                 )}
               </div>

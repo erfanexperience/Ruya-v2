@@ -1944,31 +1944,61 @@ html, body {
   border-left: 2px solid var(--accent-orange);
   background: rgba(255, 107, 53, 0.05);
   border-radius: 0 4px 4px 0;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.news-card-take:hover {
+  background: rgba(255, 107, 53, 0.09);
+}
+
+.news-card-take--expanded {
+  background: rgba(255, 107, 53, 0.08);
+}
+
+.news-card-take-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 5px;
 }
 
 .news-card-take-label {
-  display: block;
   font-family: var(--font-display);
   font-size: 7px;
   font-weight: 700;
   letter-spacing: 0.18em;
   color: var(--accent-orange);
-  margin-bottom: 4px;
-  opacity: 0.85;
+  opacity: 0.9;
 }
+
+.news-card-take-toggle {
+  font-size: 7px;
+  color: var(--accent-orange);
+  opacity: 0.6;
+  transition: opacity 0.2s;
+}
+
+.news-card-take:hover .news-card-take-toggle { opacity: 1; }
 
 .news-card-take-text {
   font-family: var(--font-body);
   font-size: 11px;
-  line-height: 1.55;
-  color: rgba(200, 216, 224, 0.75);
+  line-height: 1.6;
+  color: rgba(200, 216, 224, 0.8);
   margin: 0;
+}
+
+.news-card-take--expanded .news-card-take-text {
+  color: rgba(200, 216, 224, 0.92);
+  font-size: 11.5px;
 }
 
 [dir="rtl"] .news-card-take {
   border-left: none;
   border-right: 2px solid var(--accent-orange);
   border-radius: 4px 0 0 4px;
+  padding: 8px 12px 8px 10px;
 }
 
 /* ─── Taitan Take ────────────────────────────────────────────────────────────── */
