@@ -10,27 +10,13 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 }
 
-// Condensed prompt — same voice and constraints, half the tokens
-const SYSTEM_PROMPT = `You are a senior business strategist fluent in Saudi Arabia and Silicon Valley. Write a TAITAN TAKE — a single paragraph of strategic analysis for a news article. This is NOT a summary. It explains what a sophisticated global reader is most likely to miss or undersize about the article, read through the lens of Taitan Global (the firm that brings the best American companies to Saudi Arabia).
+// Single-call prompt — no system/user split, minimal tokens, full output
+function buildPrompt(title: string, description: string): string {
+  return `Write a Taitan Take: a single paragraph (exactly 120-180 words, 5-7 sentences) of strategic business analysis for this Saudi tech news article. You are a senior business strategist. Rules: (1) NOT a summary — explain what sophisticated readers miss. (2) Cite at least one: Saudi GDP ~$1.07T, PIF ~$925B AUM, Vision 2030, NEOM, HUMAIN, Riyadh growing to 15M. (3) Close with what this means for US companies entering Saudi Arabia. (4) Voice: direct, evidence-led, zero hype. (5) Return ONLY the paragraph, no labels or preamble.
 
-SAUDI FACTS — cite at least one:
-- Saudi GDP ~$1.07T (2024), G20, ~17th largest globally
-- PIF (Public Investment Fund) ~$925B AUM, target $2T by 2030
-- HUMAIN: PIF's AI champion, 18,000 Nvidia Blackwell GPUs, launched May 2025
-- Vision 2030: launched 2016, diversification from oil; giga-projects include NEOM, The Line, Qiddiya, Red Sea Global, Diriyah Gate, AlUla
-- Capital moves faster than US institutional cycles — billion-dollar decisions in weeks
-- Women's workforce participation: 17% (2017) to 36%+ (2024)
-- Riyadh: 7-8M population, growing to 15M by 2030
-- 2034 FIFA World Cup host, Expo 2030, F1, LIV Golf
-
-OUTPUT RULES — follow exactly:
-- ONE paragraph only. No headings, bullets, or line breaks.
-- 120 to 180 words. 5 to 7 sentences.
-- Open with the strategic frame, NOT "This article is about..."
-- Close with the US-to-Saudi bridge: what this means for American operators entering Saudi Arabia
-- Voice: confident, evidence-led strategist. No hype, no emoji.
-- No regional framing ("For Western readers...", "In the US...")
-- Return ONLY the paragraph. No preamble, no labels, no notes.`
+Title: ${title}
+${description ? `Context: ${description}` : ''}`
+}
 
 const GEMINI_MODELS = [
   'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent',
@@ -127,7 +113,7 @@ Deno.serve(async (req) => {
     )
   }
 
-  console.log(`[generate-takes] Generating Takes for ${articles.length} articles...`)
+  console.log(`[generate-takes] Processing ${articles.length} articles...`)
 
   let generated = 0
   let failed = 0
@@ -135,10 +121,12 @@ Deno.serve(async (req) => {
 
   for (const article of articles) {
     try {
-      const fullPrompt = `${SYSTEM_PROMPT}\n\nWrite the Taitan Take for the article below. Return only the paragraph.\n\nARTICLE:\nTitle: ${article.title}\n${article.description ? `Content: ${article.description}` : ''}`
-      const take = await callGemini(fullPrompt, GEMINI_KEY)
+      const content = article.description || article.summary || ''
+      const prompt = buildPrompt(article.title, content)
+      const take = await callGemini(prompt, GEMINI_KEY)
 
-      if (take && take.length >= 200) {
+      // Accept anything over 80 chars — log quality for monitoring
+      if (take && take.length >= 80) {
         const { error: updateErr } = await supabase
           .from('articles')
           .update({ taitan_take: take })
@@ -149,10 +137,10 @@ Deno.serve(async (req) => {
           failed++
         } else {
           generated++
-          console.log(`[generate-takes] OK "${article.title.slice(0, 50)}" (${take.length} chars)`)
+          console.log(`[generate-takes] Saved (${take.length} chars): "${article.title.slice(0, 50)}"`)
         }
       } else if (take) {
-        lastError = `Take too short (${take.length} chars): "${take.slice(0, 80)}"`
+        lastError = `Too short (${take.length} chars): "${take.slice(0, 60)}"`
         console.warn(`[generate-takes] Rejected: ${lastError}`)
         failed++
       } else {

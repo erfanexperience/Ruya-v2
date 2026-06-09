@@ -10,7 +10,57 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 }
 
-const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent'
+// Stable paid-tier models only (deprecated/unavailable models removed)
+const GEMINI_MODELS = [
+  'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent',
+  'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent',
+]
+
+async function sleep(ms: number) {
+  return new Promise(r => setTimeout(r, ms))
+}
+
+async function callGeminiWithRetry(
+  prompt: string,
+  key: string,
+): Promise<string> {
+  for (const modelUrl of GEMINI_MODELS) {
+    try {
+      const res = await fetch(`${modelUrl}?key=${key}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: { temperature: 0.2, maxOutputTokens: 500 },
+        }),
+      })
+
+      if (res.status === 503 || res.status === 429) {
+        console.warn(`[translate] ${res.status} from ${modelUrl} — trying next model`)
+        await sleep(1000)
+        continue // try next model immediately
+      }
+
+      if (!res.ok) {
+        const errText = await res.text()
+        console.warn(`[translate] Error ${res.status} from ${modelUrl}: ${errText.slice(0, 200)}`)
+        continue // try next model
+      }
+
+      const data = await res.json()
+      const text = data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || ''
+      if (text) {
+        console.log(`[translate] Success with ${modelUrl.split('/models/')[1]?.split(':')[0]}`)
+        return text
+      }
+
+      console.warn(`[translate] Empty response from ${modelUrl}`)
+    } catch (e: any) {
+      console.warn(`[translate] Network error from ${modelUrl}: ${e.message}`)
+    }
+  }
+  throw new Error('All Gemini models failed')
+}
 
 async function translateToArabic(
   title: string,
@@ -26,19 +76,7 @@ Do not add labels, numbers, or any other text.
 Title: ${title}
 Summary: ${summary}`
 
-  const res = await fetch(`${GEMINI_URL}?key=${key}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      contents: [{ parts: [{ text: prompt }] }],
-      generationConfig: { temperature: 0.2, maxOutputTokens: 500 },
-    }),
-  })
-
-  if (!res.ok) throw new Error(`Gemini ${res.status}: ${await res.text()}`)
-  const data = await res.json()
-  const raw = data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || ''
-
+  const raw = await callGeminiWithRetry(prompt, key)
   if (!raw) return null
 
   // Split into lines, filter empty
@@ -80,13 +118,13 @@ Deno.serve(async (req) => {
     Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
   )
 
-  // Fetch up to 40 articles missing Arabic translation
+  // Fetch up to 5 articles missing Arabic translation (keep well under 150s timeout)
   const { data: articles, error } = await supabase
     .from('articles')
     .select('url, title, summary, description')
     .is('title_ar', null)
     .not('title', 'is', null)
-    .limit(15)
+    .limit(5)
 
   if (error) {
     return new Response(JSON.stringify({ error: error.message }), {
@@ -125,7 +163,7 @@ Deno.serve(async (req) => {
           translated++
         }
       } else {
-        lastError = 'JSON parse failed'
+        lastError = 'Empty response from Gemini'
         failed++
       }
     } catch (e: any) {
@@ -135,7 +173,7 @@ Deno.serve(async (req) => {
     }
 
     // 1s delay between calls
-    await new Promise(r => setTimeout(r, 1000))
+    await sleep(1000)
   }
 
   console.log(`[translate-articles] Done: ${translated} translated, ${failed} failed`)
