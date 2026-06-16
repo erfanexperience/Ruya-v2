@@ -1,9 +1,9 @@
 // ArticleModal.jsx
 // Full-screen article detail overlay shown when a card is clicked.
+// Taitan Takes are loaded from DB (article.taitanTake) — no client-side AI calls.
 
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { timeAgo, getFallbackImage } from '../utils/helpers.js';
-import { generateTaitanTake, translateTaitanTake } from '../services/geminiService.js';
 
 export default function ArticleModal({ article, language, onClose }) {
   const isArabic = language === 'ar';
@@ -15,36 +15,7 @@ export default function ArticleModal({ article, language, onClose }) {
   const url         = article.url         || '#';
   const image       = article.image       || getFallbackImage(article.title || '');
   const publishedAt = article.publishedAt;
-
-  const [take, setTake]               = useState(article.taitanTake || null);
-  const [takeLoading, setTakeLoading] = useState(!article.taitanTake);
-  const [takeAr, setTakeAr]           = useState(null);
-  const [takeArLoading, setTakeArLoading] = useState(false);
-
-  // Step 1 — fetch English Take (from article object or on-demand)
-  useEffect(() => {
-    if (article.taitanTake) { setTake(article.taitanTake); setTakeLoading(false); return; }
-    let cancelled = false;
-    generateTaitanTake(article)
-      .then(t => { if (!cancelled) { setTake(t || null); setTakeLoading(false); } })
-      .catch(() => { if (!cancelled) setTakeLoading(false); });
-    return () => { cancelled = true; };
-  }, [article]);
-
-  // Step 2 — when Arabic mode and English Take is ready, fetch Arabic translation
-  useEffect(() => {
-    if (!isArabic || !take) return;
-    let cancelled = false;
-    setTakeArLoading(true);
-    translateTaitanTake(take, article.url)
-      .then(t => { if (!cancelled) { setTakeAr(t || null); setTakeArLoading(false); } })
-      .catch(() => { if (!cancelled) setTakeArLoading(false); });
-    return () => { cancelled = true; };
-  }, [isArabic, take, article.url]);
-
-  // Displayed take: Arabic translation when ready, fall back to English
-  const displayTake     = isArabic ? (takeAr || take) : take;
-  const displayLoading  = isArabic ? (takeLoading || takeArLoading) : takeLoading;
+  const take        = article.taitanTake  || null;
 
   // Close on Escape
   useEffect(() => {
@@ -79,8 +50,6 @@ export default function ArticleModal({ article, language, onClose }) {
           <img src={image} alt={title} className="article-modal-hero-img"
             onError={e => { e.target.style.display = 'none'; }} />
           <div className="article-modal-hero-overlay" />
-
-          {/* Meta pills on top of image */}
           <div className="article-modal-hero-meta">
             {tag && <span className="article-modal-tag">{tag}</span>}
           </div>
@@ -97,7 +66,7 @@ export default function ArticleModal({ article, language, onClose }) {
 
           <div className="article-modal-divider" />
 
-          {/* Summary / description */}
+          {/* Summary */}
           <div className="article-modal-content">
             {summary
               ? summary.split('\n').filter(Boolean).map((para, i) => (
@@ -109,8 +78,8 @@ export default function ArticleModal({ article, language, onClose }) {
             }
           </div>
 
-          {/* Taitan Take */}
-          {(displayTake || displayLoading) && (
+          {/* Taitan Take — served from DB, no client-side AI calls */}
+          {take && (
             <div className="taitan-take">
               <div className="taitan-take-header">
                 <span className="taitan-take-label">
@@ -118,15 +87,7 @@ export default function ArticleModal({ article, language, onClose }) {
                 </span>
                 <div className="taitan-take-line" />
               </div>
-              {displayLoading ? (
-                <div className="taitan-take-loading">
-                  <span className="taitan-take-shimmer" />
-                  <span className="taitan-take-shimmer taitan-take-shimmer--mid" />
-                  <span className="taitan-take-shimmer taitan-take-shimmer--short" />
-                </div>
-              ) : (
-                <p className="taitan-take-body">{displayTake}</p>
-              )}
+              <p className="taitan-take-body">{take}</p>
             </div>
           )}
 
