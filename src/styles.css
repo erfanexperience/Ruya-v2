@@ -1170,24 +1170,40 @@ html, body {
 }
 
 .hero-card .news-card-image-wrap {
-  height: 48%;
+  height: 42%;
 }
 
 .hero-card .news-card-body {
   padding: 12px 14px;
-  gap: 7px;
+  gap: 6px;
+  overflow: hidden;
+}
+
+.hero-card .news-card-meta,
+.hero-card .news-card-tag,
+.hero-card .news-card-title {
+  flex-shrink: 0;
 }
 
 .hero-card .news-card-title {
   font-size: 15px;
   font-weight: 800;
-  -webkit-line-clamp: 3;
+  -webkit-line-clamp: 2;
   line-height: 1.35;
 }
 
+/* Summary takes all remaining space and clips — never pushes Take off screen */
 .hero-card .news-card-summary {
-  -webkit-line-clamp: 4;
+  flex: 1 1 0;
+  min-height: 0;
+  display: block;
+  overflow: hidden;
   font-size: 12px;
+}
+
+/* Take is always fully visible — never shrinks */
+.hero-card .news-card-take {
+  flex-shrink: 0;
 }
 
 .hero-label {

@@ -5,8 +5,9 @@ import { useState, useRef, useEffect } from 'react';
 import { timeAgo, getFallbackImage } from '../utils/helpers.js';
 
 export default function HeroCard({ article, language = 'en', onSelect }) {
-  const [isFlipped, setIsFlipped] = useState(false);
-  const [imgLoaded, setImgLoaded] = useState(false);
+  const [isFlipped, setIsFlipped]       = useState(false);
+  const [imgLoaded, setImgLoaded]       = useState(false);
+  const [takeExpanded, setTakeExpanded] = useState(false);
 
   const cardRef   = useRef(null);
   const imgRef    = useRef(null);
@@ -24,6 +25,14 @@ export default function HeroCard({ article, language = 'en', onSelect }) {
   const url         = article.url         || '#';
   const image       = article.image       || getFallbackImage(article.title);
   const publishedAt = article.publishedAt;
+
+  const rawTake     = article.taitanTake || null;
+  const takePreview = rawTake
+    ? (() => {
+        const first = rawTake.split(/(?<=\.)\s/)[0] || rawTake;
+        return first.length > 140 ? first.slice(0, 137) + '…' : first;
+      })()
+    : null;
 
   // Lazy image
   useEffect(() => {
@@ -107,6 +116,23 @@ export default function HeroCard({ article, language = 'en', onSelect }) {
             {tag && <span className="news-card-tag">{tag}</span>}
             <h2 className="news-card-title">{title}</h2>
             <p className="news-card-summary">{summary}</p>
+            {takePreview && (
+              <div
+                className={`news-card-take${takeExpanded ? ' news-card-take--expanded' : ''}`}
+                onClick={e => { e.stopPropagation(); setTakeExpanded(x => !x); }}
+                role="button"
+                tabIndex={0}
+                onKeyDown={e => { if (e.key === 'Enter') { e.stopPropagation(); setTakeExpanded(x => !x); }}}
+              >
+                <div className="news-card-take-header">
+                  <span className="news-card-take-label">{isArabic ? 'رأي تايتان' : 'TAITAN TAKE'}</span>
+                  <span className="news-card-take-toggle">{takeExpanded ? '▲' : '▼'}</span>
+                </div>
+                <p className="news-card-take-text">
+                  {takeExpanded ? rawTake : takePreview}
+                </p>
+              </div>
+            )}
           </div>
         </div>
 
