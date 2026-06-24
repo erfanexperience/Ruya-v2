@@ -162,7 +162,7 @@ export default function AdminPage() {
           </div>
           <div className="admin-stat-card admin-stat-card--ok">
             <span className="admin-stat-label">Auto Refresh</span>
-            <span className="admin-stat-value" style={{ fontSize: 13 }}>Daily 07:00 AST</span>
+            <span className="admin-stat-value" style={{ fontSize: 13 }}>Every 48h</span>
           </div>
         </div>
 

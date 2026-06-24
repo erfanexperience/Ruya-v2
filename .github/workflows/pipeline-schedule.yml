@@ -1,0 +1,160 @@
+name: Auto Pipeline (48h)
+
+# Checks every 6 hours. Runs the full pipeline only if 48h have elapsed
+# since the last run (tracked via fetch_log table in Supabase).
+# Manual "Run Full Pipeline" in /admin also writes to fetch_log, so it
+# naturally resets this 48h timer.
+
+on:
+  schedule:
+    - cron: '0 1,7,13,19 * * *'  # Check at 01:00, 07:00, 13:00, 19:00 UTC
+  workflow_dispatch:               # Allow manual trigger from GitHub UI
+
+jobs:
+  pipeline:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Check if 48h have elapsed since last run
+        id: check
+        env:
+          SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+        run: |
+          RESP=$(curl -sf \
+            "${SUPABASE_URL}/rest/v1/fetch_log?select=ran_at&order=ran_at.desc&limit=1" \
+            -H "apikey: ${SUPABASE_KEY}" \
+            -H "Authorization: Bearer ${SUPABASE_KEY}" || echo "[]")
+
+          LAST_RAN=$(python3 -c "
+          import sys, json
+          data = json.loads('$RESP'.replace(\"'\", ''))
+          print(data[0]['ran_at'] if data else '')
+          " 2>/dev/null || echo "")
+
+          if [ -z "$LAST_RAN" ]; then
+            echo "No previous run found — running pipeline."
+            echo "should_run=true" >> $GITHUB_OUTPUT
+          else
+            ELAPSED=$(python3 -c "
+          from datetime import datetime, timezone
+          import re
+          s = '$LAST_RAN'
+          s = re.sub(r'\+\d{2}:\d{2}$', '', s).rstrip('Z')
+          for fmt in ['%Y-%m-%dT%H:%M:%S.%f', '%Y-%m-%dT%H:%M:%S']:
+              try:
+                  dt = datetime.strptime(s, fmt).replace(tzinfo=timezone.utc)
+                  from datetime import datetime as dt2
+                  now = datetime.now(timezone.utc)
+                  print(int((now - dt).total_seconds()))
+                  break
+              except: pass
+          " 2>/dev/null || echo "0")
+            HOURS=$((ELAPSED / 3600))
+            echo "Last run was ${HOURS}h ago (${ELAPSED}s)."
+            if [ "$ELAPSED" -gt 172800 ]; then
+              echo "48h+ elapsed — running pipeline."
+              echo "should_run=true" >> $GITHUB_OUTPUT
+            else
+              echo "Less than 48h (${HOURS}h) — skipping."
+              echo "should_run=false" >> $GITHUB_OUTPUT
+            fi
+          fi
+
+      # ── Step 1: Fetch news ──────────────────────────────────────────────────
+      - name: Step 1 — Fetch news
+        if: steps.check.outputs.should_run == 'true'
+        env:
+          SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          ADMIN_KEY: ${{ secrets.ADMIN_KEY }}
+        run: |
+          echo "Fetching news from all sources..."
+          RESP=$(curl -sf -X POST \
+            "${SUPABASE_URL}/functions/v1/fetch-news" \
+            -H "Content-Type: application/json" \
+            -H "x-admin-key: ${ADMIN_KEY}" \
+            -d '{}' || echo '{}')
+          echo "$RESP" | python3 -c "
+          import sys, json
+          d = json.load(sys.stdin)
+          print(f'Stored: {d.get(\"stored\",\"?\")} | AI tagged: {d.get(\"ai_tagged\",\"?\")}')
+          " 2>/dev/null || echo "Fetch done."
+
+      - name: Pause after fetch
+        if: steps.check.outputs.should_run == 'true'
+        run: sleep 30
+
+      # ── Step 2: Translate to Arabic ────────────────────────────────────────
+      - name: Step 2 — Translate to Arabic
+        if: steps.check.outputs.should_run == 'true'
+        env:
+          SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          ADMIN_KEY: ${{ secrets.ADMIN_KEY }}
+        run: |
+          TOTAL=0
+          FAILS=0
+          for i in $(seq 1 25); do
+            RESP=$(curl -sf -X POST \
+              "${SUPABASE_URL}/functions/v1/translate-articles" \
+              -H "Content-Type: application/json" \
+              -H "x-admin-key: ${ADMIN_KEY}" \
+              -d '{}' || echo '{"translated":0,"message":"error"}')
+            TRANSLATED=$(echo "$RESP" | python3 -c "import sys,json; print(json.load(sys.stdin).get('translated',0))" 2>/dev/null || echo "0")
+            MSG=$(echo "$RESP" | python3 -c "import sys,json; print(json.load(sys.stdin).get('message',''))" 2>/dev/null || echo "")
+            TOTAL=$((TOTAL + TRANSLATED))
+            echo "Round $i: translated=${TRANSLATED}, total=${TOTAL}"
+            if echo "$MSG" | grep -qi "already translated"; then
+              echo "All articles translated."
+              break
+            fi
+            if [ "$TRANSLATED" = "0" ]; then
+              FAILS=$((FAILS + 1))
+              [ "$FAILS" -ge 3 ] && echo "3 empty rounds — stopping translation." && break
+            else
+              FAILS=0
+            fi
+            sleep 5
+          done
+          echo "Translation done. Total: $TOTAL"
+
+      - name: Pause after translation
+        if: steps.check.outputs.should_run == 'true'
+        run: sleep 30
+
+      # ── Step 3: Generate Taitan Takes ──────────────────────────────────────
+      - name: Step 3 — Generate Taitan Takes
+        if: steps.check.outputs.should_run == 'true'
+        env:
+          SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          ADMIN_KEY: ${{ secrets.ADMIN_KEY }}
+        run: |
+          TOTAL=0
+          FAILS=0
+          for i in $(seq 1 40); do
+            RESP=$(curl -sf -X POST \
+              "${SUPABASE_URL}/functions/v1/generate-takes" \
+              -H "Content-Type: application/json" \
+              -H "x-admin-key: ${ADMIN_KEY}" \
+              -d '{}' || echo '{"generated":0,"message":"error"}')
+            GENERATED=$(echo "$RESP" | python3 -c "import sys,json; print(json.load(sys.stdin).get('generated',0))" 2>/dev/null || echo "0")
+            MSG=$(echo "$RESP" | python3 -c "import sys,json; print(json.load(sys.stdin).get('message',''))" 2>/dev/null || echo "")
+            TOTAL=$((TOTAL + GENERATED))
+            echo "Round $i: generated=${GENERATED}, total=${TOTAL}"
+            if echo "$MSG" | grep -qi "already have"; then
+              echo "All Takes generated."
+              break
+            fi
+            if [ "$GENERATED" = "0" ]; then
+              FAILS=$((FAILS + 1))
+              [ "$FAILS" -ge 3 ] && echo "3 empty rounds — stopping Takes." && break
+            else
+              FAILS=0
+            fi
+            sleep 5
+          done
+          echo "Takes done. Total: $TOTAL"
+
+      - name: Pipeline complete
+        if: steps.check.outputs.should_run == 'true'
+        run: echo "Full pipeline finished successfully."
