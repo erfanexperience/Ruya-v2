@@ -71,7 +71,7 @@ jobs:
         run: |
           echo "Fetching news from all sources..."
           RESP=$(curl -sf -X POST \
-            "${SUPABASE_URL}/functions/v1/fetch-news" \
+            "${SUPABASE_URL}/functions/v1/scheduled-fetch" \
             -H "Content-Type: application/json" \
             -H "x-admin-key: ${ADMIN_KEY}" \
             -d '{}' || echo '{}')

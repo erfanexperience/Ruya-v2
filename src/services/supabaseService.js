@@ -39,7 +39,7 @@ export async function fetchArticlesFromDB() {
 // ─── Admin: trigger server-side fetch ────────────────────────────────────────
 
 export async function triggerFetchNews(adminPassword) {
-  const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/fetch-news`
+  const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/scheduled-fetch`
   const res = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'x-admin-key': adminPassword },
