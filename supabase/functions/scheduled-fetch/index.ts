@@ -366,6 +366,8 @@ Deno.serve(async (req) => {
     Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
   )
 
+  const MAX_ARTICLES = 80
+
   console.log('[scheduled-fetch] Starting full news fetch from all sources...')
 
   let errorMsg = ''
@@ -381,15 +383,19 @@ Deno.serve(async (req) => {
       ...RSS_FEEDS.map(feed => fetchRSSFeed(feed)),
     ])
 
-    // Collect all articles — skip failed sources but continue
+    // Collect all articles and track per-source counts
     const allArticles: Article[] = []
+    const sourceCounts: Record<string, number> = {}
     results.forEach((r, i) => {
+      const name = sourceNames[i]
       if (r.status === 'fulfilled') {
         allArticles.push(...r.value)
-        console.log(`[scheduled-fetch] ${sourceNames[i]}: ${r.value.length} articles`)
+        sourceCounts[name] = r.value.length
+        console.log(`[scheduled-fetch] ${name}: ${r.value.length} articles`)
       } else {
         const msg = (r.reason as Error)?.message || String(r.reason)
-        console.warn(`[scheduled-fetch] ${sourceNames[i]} failed: ${msg}`)
+        sourceCounts[name] = 0
+        console.warn(`[scheduled-fetch] ${name} failed: ${msg}`)
       }
     })
 
@@ -428,7 +434,41 @@ Deno.serve(async (req) => {
     }
 
     const ai_tagged = unique.filter(a => a.tag !== null).length
-    console.log(`[scheduled-fetch] Done — stored: ${stored}, pre-tagged: ${ai_tagged}`)
+
+    // ── Trim to MAX_ARTICLES — delete oldest beyond the cap ───────────────────
+    let trimmed = 0
+    const { count: totalAfterUpsert } = await supabase
+      .from('articles')
+      .select('*', { count: 'exact', head: true })
+
+    if (totalAfterUpsert && totalAfterUpsert > MAX_ARTICLES) {
+      const excess = totalAfterUpsert - MAX_ARTICLES
+      console.log(`[scheduled-fetch] DB has ${totalAfterUpsert} articles — trimming ${excess} oldest`)
+
+      const { data: oldest } = await supabase
+        .from('articles')
+        .select('url')
+        .not('published_at', 'is', null)
+        .order('published_at', { ascending: true })
+        .limit(excess)
+
+      if (oldest && oldest.length > 0) {
+        const urlsToDelete = oldest.map((a: any) => a.url)
+        const { error: deleteErr } = await supabase
+          .from('articles')
+          .delete()
+          .in('url', urlsToDelete)
+
+        if (deleteErr) {
+          console.error('[scheduled-fetch] Trim error:', deleteErr.message)
+        } else {
+          trimmed = urlsToDelete.length
+          console.log(`[scheduled-fetch] Trimmed ${trimmed} oldest articles`)
+        }
+      }
+    }
+
+    console.log(`[scheduled-fetch] Done — stored: ${stored}, pre-tagged: ${ai_tagged}, trimmed: ${trimmed}`)
 
     // Record run in fetch_log
     await supabase.from('fetch_log').insert({
@@ -440,7 +480,7 @@ Deno.serve(async (req) => {
     })
 
     return new Response(
-      JSON.stringify({ success: true, raw, stored, ai_tagged }),
+      JSON.stringify({ success: true, raw, stored, ai_tagged, trimmed, sources: sourceCounts }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
   } catch (e: any) {
