@@ -1,12 +1,15 @@
 // supabase/functions/run-pipeline/index.ts
 // Self-pacing orchestrator: each call does the next chunk of pipeline work.
-//   1. If 48h+ since the last fetch (or ?force=1) → run scheduled-fetch
+//   1. If 48h+ since the last fetch (or force) → run scheduled-fetch
 //   2. Translate untranslated articles (translate-articles, repeated)
 //   3. Generate missing Taitan Takes (generate-takes, repeated)
 // Stops starting new work after TIME_BUDGET_MS so it stays under the edge
 // function wall-clock limit; the next call picks up where this one left off.
 // Called by: external cron (cron-job.org) every 15 minutes, which also keeps
 // the Supabase free-tier project from pausing.
+//
+// Responds 202 immediately and works in the background (cron services time
+// out long before a run finishes). Add ?wait=1 to get the run summary instead.
 // Body { "mode": "check" } only verifies the admin key (used by /admin login).
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
@@ -27,19 +30,7 @@ function json(body: unknown, status = 200) {
   })
 }
 
-Deno.serve(async (req) => {
-  if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
-
-  const ADMIN_PASS = Deno.env.get('ADMIN_PASSWORD')
-  if (!ADMIN_PASS) return json({ error: 'ADMIN_PASSWORD secret not set' }, 500)
-  if (req.headers.get('x-admin-key') !== ADMIN_PASS) return json({ error: 'Unauthorized' }, 401)
-
-  let body: any = {}
-  try { body = await req.json() } catch { /* GET or empty body */ }
-  if (body.mode === 'check') return json({ success: true })
-
-  const force = new URL(req.url).searchParams.get('force') === '1' || body.force === true
-
+async function runPipeline(adminPass: string, force: boolean) {
   const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
   const ANON_KEY     = Deno.env.get('SUPABASE_ANON_KEY') || ''
   const supabase = createClient(SUPABASE_URL, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!)
@@ -53,7 +44,7 @@ Deno.serve(async (req) => {
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${ANON_KEY}`,
-        'x-admin-key': ADMIN_PASS!,
+        'x-admin-key': adminPass,
       },
       body: '{}',
     })
@@ -126,5 +117,28 @@ Deno.serve(async (req) => {
   if (errors.length) summary.errors = errors
 
   console.log('[run-pipeline]', JSON.stringify(summary))
-  return json({ success: errors.length === 0, ...summary })
+  return { success: errors.length === 0, ...summary }
+}
+
+Deno.serve(async (req) => {
+  if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
+
+  const ADMIN_PASS = Deno.env.get('ADMIN_PASSWORD')
+  if (!ADMIN_PASS) return json({ error: 'ADMIN_PASSWORD secret not set' }, 500)
+  if (req.headers.get('x-admin-key') !== ADMIN_PASS) return json({ error: 'Unauthorized' }, 401)
+
+  let body: any = {}
+  try { body = await req.json() } catch { /* GET or empty body */ }
+  if (body.mode === 'check') return json({ success: true })
+
+  const params = new URL(req.url).searchParams
+  const force  = params.get('force') === '1' || body.force === true
+  const wait   = params.get('wait') === '1'  || body.wait === true
+
+  const work = runPipeline(ADMIN_PASS, force)
+  if (wait) return json(await work)
+
+  // @ts-ignore EdgeRuntime is provided by the Supabase edge runtime
+  EdgeRuntime.waitUntil(work)
+  return json({ success: true, started: true }, 202)
 })
