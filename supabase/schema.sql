@@ -52,24 +52,15 @@ create policy "service_all_fetch_log"
   on public.fetch_log for all to service_role
   using (true) with check (true);
 
--- ─── Enable pg_cron + pg_net extensions (needed for scheduled fetch) ──────────
--- These may already be enabled. Safe to run again.
-create extension if not exists pg_cron;
-create extension if not exists pg_net;
 
--- ─── Daily cron: fetch news every day at 04:00 UTC (07:00 Riyadh time) ────────
--- Replace Global$23 if you change the admin password
-select cron.schedule(
-  'ruya-fetch-news-daily',
-  '0 4 * * *',
-  $$
-  select net.http_post(
-    url     := 'https://esacgqoalnvyzpsgrruc.supabase.co/functions/v1/fetch-news',
-    headers := jsonb_build_object(
-      'Content-Type', 'application/json',
-      'x-admin-key',  'Taitan12@@4'
-    ),
-    body    := '{}'::jsonb
-  );
-  $$
-);
+-- ─── Columns added after the initial schema ───────────────────────────────────
+alter table public.articles add column if not exists title_ar    text;
+alter table public.articles add column if not exists summary_ar  text;
+alter table public.articles add column if not exists taitan_take text;
+
+-- ─── Scheduling ───────────────────────────────────────────────────────────────
+-- The pipeline is driven by an external cron (cron-job.org) calling the
+-- run-pipeline edge function every 15 minutes with the x-admin-key header.
+-- An earlier pg_cron job ('ruya-fetch-news-daily') called the retired
+-- fetch-news function; remove it if it still exists:
+--   select cron.unschedule('ruya-fetch-news-daily');

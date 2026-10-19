@@ -3,9 +3,8 @@
 // Triggers the Supabase edge function for a forced content refresh.
 
 import { useState, useEffect } from 'react';
-import { getDBStats, triggerFetchNews, triggerTranslateArticles, triggerGenerateTakes } from '../services/supabaseService.js';
+import { getDBStats, triggerFetchNews, triggerTranslateArticles, triggerGenerateTakes, verifyAdminPassword } from '../services/supabaseService.js';
 
-const ADMIN_PASSWORD = 'Taitan12@@4';
 
 const TAG_LABELS = {
   'Vision 2030':           'Vision 2030',
@@ -46,9 +45,9 @@ export default function AdminPage() {
   const [pipelineResult, setPipelineResult]     = useState(null);
   const [progress, setProgress]                 = useState('');
 
-  function handleLogin(e) {
+  async function handleLogin(e) {
     e.preventDefault();
-    if (pw === ADMIN_PASSWORD) {
+    if (await verifyAdminPassword(pw).catch(() => false)) {
       setAuthed(true);
     } else {
       setPwError(true);
@@ -78,7 +77,7 @@ export default function AdminPage() {
     setProgress('Calling Supabase edge function — fetching all news sources…');
 
     try {
-      const res = await triggerFetchNews(ADMIN_PASSWORD);
+      const res = await triggerFetchNews(pw);
       setResult({
         success: true,
         message: `Done. ${res.raw} raw → ${res.stored} stored. AI tagged: ${res.ai_tagged}.`,
@@ -170,7 +169,7 @@ export default function AdminPage() {
         <div className="admin-section" style={{ borderColor: 'rgba(0,255,136,0.3)', background: 'rgba(0,255,136,0.02)' }}>
           <h2 className="admin-section-title">Run Full Pipeline</h2>
           <p className="admin-section-desc">
-            Runs all three steps in sequence: fetch latest articles → translate to Arabic → generate Taitan Takes. Same as the daily 07:00 AST automation — use this for an on-demand full refresh.
+            Runs all three steps in sequence: fetch latest articles → translate to Arabic → generate Taitan Takes. The same pipeline runs automatically (fetch every 48h, then translation and Takes) — use this for an on-demand full refresh.
           </p>
 
           {pipelineRunning && (
@@ -196,14 +195,14 @@ export default function AdminPage() {
               try {
                 // Step 1: Fetch
                 setProgress('Step 1/3 — Fetching latest articles…');
-                const fetchRes = await triggerFetchNews(ADMIN_PASSWORD);
+                const fetchRes = await triggerFetchNews(pw);
 
                 // Step 2: Translate (loop until done)
                 setProgress('Step 2/3 — Translating to Arabic…');
                 let translated = 0;
                 let transFails = 0;
                 while (transFails < 3) {
-                  const res = await triggerTranslateArticles(ADMIN_PASSWORD);
+                  const res = await triggerTranslateArticles(pw);
                   if (res.translated > 0) { translated += res.translated; transFails = 0; }
                   else transFails++;
                   if (res.message === 'All articles already translated') break;
@@ -215,7 +214,7 @@ export default function AdminPage() {
                 let takes = 0;
                 let takesFails = 0;
                 while (takesFails < 3) {
-                  const res = await triggerGenerateTakes(ADMIN_PASSWORD);
+                  const res = await triggerGenerateTakes(pw);
                   if (res.generated > 0) { takes += res.generated; takesFails = 0; }
                   else takesFails++;
                   if (res.message === 'All articles already have a Taitan Take') break;
@@ -284,7 +283,7 @@ export default function AdminPage() {
         <div className="admin-section">
           <h2 className="admin-section-title">Force Content Refresh</h2>
           <p className="admin-section-desc">
-            Triggers the Supabase edge function immediately — fetches all news sources, deduplicates, stores to DB, and runs Gemini tagging on up to 15 untagged articles. Normally this runs automatically every day at 07:00 Riyadh time. Use this only when you want fresh content before the scheduled run.
+            Triggers the Supabase edge function immediately — fetches all news sources, deduplicates, stores to DB, and stores to DB. Normally this runs automatically every 48h. Use this only when you want fresh content before the scheduled run.
           </p>
 
           {running && (
@@ -333,7 +332,7 @@ export default function AdminPage() {
         <div className="admin-section">
           <h2 className="admin-section-title">Arabic Translation</h2>
           <p className="admin-section-desc">
-            Auto-translates all untranslated articles to Arabic via Gemini (5 at a time) and stores them permanently. Keeps running until all articles are done.
+            Auto-translates all untranslated articles to Arabic via Claude (5 at a time) and stores them permanently. Keeps running until all articles are done.
           </p>
 
           {translating && (
@@ -361,7 +360,7 @@ export default function AdminPage() {
               try {
                 while (true) {
                   setProgress(`Translating… ${totalTranslated} done so far`);
-                  const res = await triggerTranslateArticles(ADMIN_PASSWORD);
+                  const res = await triggerTranslateArticles(pw);
 
                   if (res.translated > 0) {
                     totalTranslated += res.translated;
@@ -431,7 +430,7 @@ export default function AdminPage() {
               try {
                 while (true) {
                   setProgress(`Generating Taitan Takes… ${totalGenerated} done so far`);
-                  const res = await triggerGenerateTakes(ADMIN_PASSWORD);
+                  const res = await triggerGenerateTakes(pw);
 
                   if (res.generated > 0) {
                     totalGenerated += res.generated;

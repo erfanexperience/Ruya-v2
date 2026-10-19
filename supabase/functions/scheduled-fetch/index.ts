@@ -349,17 +349,17 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
 
   const adminKey   = req.headers.get('x-admin-key')
-  const ADMIN_PASS = Deno.env.get('ADMIN_PASSWORD') || 'Taitan12@@4'
-  if (adminKey !== ADMIN_PASS) {
+  const ADMIN_PASS = Deno.env.get('ADMIN_PASSWORD')
+  if (!ADMIN_PASS || adminKey !== ADMIN_PASS) {
     return new Response(JSON.stringify({ error: 'Unauthorized' }), {
       status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
   }
 
-  const NEWSAPI_KEY    = Deno.env.get('NEWSAPI_KEY')    || '26c6395547cc40ab849d9a9bf8d14565'
-  const GNEWS_KEY      = Deno.env.get('GNEWS_KEY')      || 'Bbfb0573262a3db87623edced855382b'
-  const THENEWSAPI_KEY = Deno.env.get('THENEWSAPI_KEY') || 'joHu8ditzBiGk8BOeQ7sLzP5x0CloOMhoWXjM9Bw'
-  const WORLDNEWS_KEY  = Deno.env.get('WORLDNEWS_KEY')  || 'e193f998af4e43e39d80c168d7234da4'
+  const NEWSAPI_KEY    = Deno.env.get('NEWSAPI_KEY') || ''
+  const GNEWS_KEY      = Deno.env.get('GNEWS_KEY') || ''
+  const THENEWSAPI_KEY = Deno.env.get('THENEWSAPI_KEY') || ''
+  const WORLDNEWS_KEY  = Deno.env.get('WORLDNEWS_KEY') || ''
 
   const supabase = createClient(
     Deno.env.get('SUPABASE_URL')!,

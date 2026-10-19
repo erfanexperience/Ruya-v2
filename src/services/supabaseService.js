@@ -36,6 +36,18 @@ export async function fetchArticlesFromDB() {
   }))
 }
 
+// ─── Admin: verify password server-side (password is never in the bundle) ────
+
+export async function verifyAdminPassword(adminPassword) {
+  const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/run-pipeline`
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-admin-key': adminPassword },
+    body: JSON.stringify({ mode: 'check' }),
+  })
+  return res.ok
+}
+
 // ─── Admin: trigger server-side fetch ────────────────────────────────────────
 
 export async function triggerFetchNews(adminPassword) {

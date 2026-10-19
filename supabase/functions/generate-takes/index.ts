@@ -73,8 +73,8 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
 
   const adminKey   = req.headers.get('x-admin-key')
-  const ADMIN_PASS = Deno.env.get('ADMIN_PASSWORD') || 'Taitan12@@4'
-  if (adminKey !== ADMIN_PASS) {
+  const ADMIN_PASS = Deno.env.get('ADMIN_PASSWORD')
+  if (!ADMIN_PASS || adminKey !== ADMIN_PASS) {
     return new Response(JSON.stringify({ error: 'Unauthorized' }), {
       status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
